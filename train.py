@@ -1,43 +1,76 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
-from torchvision import transforms, datasets
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from PIL import Image
+import os
 from models.teacher_model import TeacherNet
-from models.student_model import StudentNet
-from utils.metrics import calculate_ssim
+from models.student_net import StudentNet
 import numpy as np
+from utils.metrics import calculate_ssim
 from tqdm import tqdm
-import cv2
 
-# Dataset with downscale-upscale transform to simulate video conferencing conditions
-class DownscaleUpscaleDataset(torch.utils.data.Dataset):
-    def __init__(self, root_dir, transform=None, downscale_size=(64, 64)):
-        self.dataset = datasets.ImageFolder(root_dir=root_dir, transform=transform)
-        self.downscale_size = downscale_size
+class ImageDataset(Dataset):
+    def __init__(self, hr_dir, lr_dir, transform_hr=None, transform_lr=None):
+        self.hr_dir = hr_dir
+        self.lr_dir = lr_dir
+        # Filter only image files with common extensions recursively
+        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+        self.hr_images = []
+        for root, _, files in os.walk(hr_dir):
+            for f in files:
+                if f.lower().endswith(valid_extensions):
+                    self.hr_images.append(os.path.join(root, f))
+        self.hr_images = sorted(self.hr_images)
+
+        self.lr_images = []
+        for root, _, files in os.walk(lr_dir):
+            for f in files:
+                if f.lower().endswith(valid_extensions):
+                    self.lr_images.append(os.path.join(root, f))
+        self.lr_images = sorted(self.lr_images)
+
+        self.transform_hr = transform_hr
+        self.transform_lr = transform_lr
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.hr_images)
 
     def __getitem__(self, idx):
-        img, label = self.dataset[idx]
-        # Downscale and then upscale image to simulate low-res input
-        img_np = np.array(img.permute(1, 2, 0))  # CxHxW to HxWxC
-        low_res = cv2.resize(img_np, self.downscale_size, interpolation=cv2.INTER_CUBIC)
-        upscaled = cv2.resize(low_res, (img_np.shape[1], img_np.shape[0]), interpolation=cv2.INTER_CUBIC)
-        upscaled = torch.tensor(upscaled).permute(2, 0, 1).float() / 255.0
-        return upscaled, img
+        hr_path = self.hr_images[idx]
+        lr_path = self.lr_images[idx]
+
+        hr_image = Image.open(hr_path).convert("RGB")
+        lr_image = Image.open(lr_path).convert("RGB")
+
+        if self.transform_hr:
+            hr_image = self.transform_hr(hr_image)
+        if self.transform_lr:
+            lr_image = self.transform_lr(lr_image)
+
+        return lr_image, hr_image
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Transforms for high-res images
-    transform = transforms.Compose([
+    # Directories for high-res and low-res images
+    hr_dir = "data/train/sharp/Sign-Language-Digits-Dataset-master/Dataset"
+    # For low-res images, we simulate by downscaling and upscaling on the fly in transform_lr
+
+    transform_hr = transforms.Compose([
+        transforms.Resize((256, 256)),
         transforms.ToTensor(),
     ])
 
-    train_dataset = DownscaleUpscaleDataset(root_dir='data/train', transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    transform_lr = transforms.Compose([
+        transforms.Resize((64, 64)),  # downscale
+        transforms.Resize((256, 256)),  # upscale back to original size
+        transforms.ToTensor(),
+    ])
+
+    dataset = ImageDataset(hr_dir=hr_dir, lr_dir=hr_dir, transform_hr=transform_hr, transform_lr=transform_lr)
+    dataloader = DataLoader(dataset, batch_size=8, shuffle=True, num_workers=2)
 
     teacher = TeacherNet().to(device)
     student = StudentNet().to(device)
@@ -45,32 +78,59 @@ def train():
     # Freeze teacher parameters
     for param in teacher.parameters():
         param.requires_grad = False
+    teacher.eval()
 
-    criterion = nn.MSELoss()
+    criterion_reconstruction = nn.MSELoss()
+    criterion_distillation = nn.MSELoss()
+
     optimizer = optim.Adam(student.parameters(), lr=1e-4)
 
-    epochs = 10
-    for epoch in range(epochs):
+    num_epochs = 10
+
+    for epoch in range(num_epochs):
         student.train()
         running_loss = 0.0
-        for inputs, targets in tqdm(train_loader):
-            inputs = inputs.to(device)
-            targets = targets.to(device)
+        for lr_imgs, hr_imgs in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+            lr_imgs = lr_imgs.to(device)
+            hr_imgs = hr_imgs.to(device)
 
             optimizer.zero_grad()
-            outputs_student = student(inputs)
-            with torch.no_grad():
-                outputs_teacher = teacher(targets)
 
-            loss = criterion(outputs_student, outputs_teacher)
+            # Teacher output (no grad)
+            with torch.no_grad():
+                teacher_outputs = teacher(hr_imgs)
+
+            # Student output
+            student_outputs = student(lr_imgs)
+
+            # Upsample student output to match hr_imgs size
+            student_outputs_upsampled = nn.functional.interpolate(student_outputs, size=hr_imgs.shape[2:], mode='bilinear', align_corners=False)
+
+            # Reconstruction loss (student output vs high-res ground truth)
+            loss_reconstruction = criterion_reconstruction(student_outputs_upsampled, hr_imgs)
+
+            # Upsample teacher output to match hr_imgs size
+            teacher_outputs_upsampled = nn.functional.interpolate(teacher_outputs, size=hr_imgs.shape[2:], mode='bilinear', align_corners=False)
+
+            # Distillation loss (student output vs teacher output)
+            loss_distillation = criterion_distillation(student_outputs_upsampled, teacher_outputs_upsampled)
+
+            # Total loss: weighted sum
+            loss = loss_reconstruction + 0.5 * loss_distillation
+
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
 
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {running_loss/len(train_loader):.4f}")
+        avg_loss = running_loss / len(dataloader)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.6f}")
 
-    torch.save(student.state_dict(), 'student_model.pth')
+        # Optional: Evaluate SSIM on a small validation set or training batch here
+
+    # Save the trained student model
+    torch.save(student.state_dict(), "student_model_trained.pth")
+    print("Training complete. Model saved as student_model_trained.pth")
 
 if __name__ == "__main__":
     train()

@@ -11,4 +11,3 @@ def calculate_ssim(img1, img2):
         img2 = img2.detach().cpu().numpy().transpose(1, 2, 0)
 
     return ssim(img1, img2, multichannel=True, data_range=img2.max() - img2.min())
-sssss
