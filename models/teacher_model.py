@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
+import torch.nn.functional as F
+
 class TeacherNet(nn.Module):
     def __init__(self):
         super(TeacherNet, self).__init__()
@@ -12,4 +14,6 @@ class TeacherNet(nn.Module):
     def forward(self, x):
         x = self.features(x)
         x = self.conv(x)
+        # Upsample to input size (assumed 256x256)
+        x = F.interpolate(x, size=(256, 256), mode='bilinear', align_corners=False)
         return x
