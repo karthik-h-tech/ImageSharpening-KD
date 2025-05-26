@@ -9,8 +9,7 @@ import random
 from models.teacher_model import TeacherNet
 from models.student_model import StudentNet
 from tqdm import tqdm
-from utils.metrics import combined_loss
-from pytorch_msssim import SSIM  # Added SSIM loss
+from pytorch_msssim import SSIM
 
 class ImageDataset(Dataset):
     def __init__(self, hr_dir, lr_dir, transform_hr=None, transform_lr=None):
@@ -18,19 +17,17 @@ class ImageDataset(Dataset):
         self.lr_dir = lr_dir
         valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
 
-        self.hr_images = []
-        for root, _, files in os.walk(hr_dir):
-            for f in files:
-                if f.lower().endswith(valid_extensions):
-                    self.hr_images.append(os.path.join(root, f))
-        self.hr_images = sorted(self.hr_images)
+        self.hr_images = sorted([
+            os.path.join(root, f)
+            for root, _, files in os.walk(hr_dir)
+            for f in files if f.lower().endswith(valid_extensions)
+        ])
 
-        self.lr_images = []
-        for root, _, files in os.walk(lr_dir):
-            for f in files:
-                if f.lower().endswith(valid_extensions):
-                    self.lr_images.append(os.path.join(root, f))
-        self.lr_images = sorted(self.lr_images)
+        self.lr_images = sorted([
+            os.path.join(root, f)
+            for root, _, files in os.walk(lr_dir)
+            for f in files if f.lower().endswith(valid_extensions)
+        ])
 
         assert len(self.hr_images) == len(self.lr_images), "HR and LR datasets must have the same number of images."
 
@@ -41,11 +38,8 @@ class ImageDataset(Dataset):
         return len(self.hr_images)
 
     def __getitem__(self, idx):
-        hr_path = self.hr_images[idx]
-        lr_path = self.lr_images[idx]
-
-        hr_image = Image.open(hr_path).convert("RGB")
-        lr_image = Image.open(lr_path).convert("RGB")
+        hr_image = Image.open(self.hr_images[idx]).convert("RGB")
+        lr_image = Image.open(self.lr_images[idx]).convert("RGB")
 
         if self.transform_hr:
             hr_image = self.transform_hr(hr_image)
@@ -61,8 +55,7 @@ def load_best_loss(filepath="best_loss.txt"):
                 return float(f.read().strip())
             except:
                 return float('inf')
-    else:
-        return float('inf')
+    return float('inf')
 
 def save_best_loss(loss, filepath="best_loss.txt"):
     with open(filepath, "w") as f:
@@ -74,19 +67,14 @@ def train():
     hr_dir = "data/train/sharp"
     lr_dir = "data/train/blurry"
 
-    transform_hr = transforms.Compose([
+    transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
     ])
 
-    transform_lr = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor(),
-    ])
+    full_dataset = ImageDataset(hr_dir=hr_dir, lr_dir=lr_dir, transform_hr=transform, transform_lr=transform)
 
-    full_dataset = ImageDataset(hr_dir=hr_dir, lr_dir=lr_dir, transform_hr=transform_hr, transform_lr=transform_lr)
-    
-    # 🔁 Subsample dataset (e.g., 1000 images)
+    random.seed(42)
     subset_size = min(1000, len(full_dataset))
     subset_indices = random.sample(range(len(full_dataset)), subset_size)
     dataset = Subset(full_dataset, subset_indices)
@@ -95,6 +83,10 @@ def train():
 
     teacher = TeacherNet().to(device)
     student = StudentNet().to(device)
+
+    if os.path.exists("student_model_trained.pth"):
+        student.load_state_dict(torch.load("student_model_trained.pth", map_location=device))
+        print("✅ Loaded existing best student model for continued training.")
 
     for param in teacher.parameters():
         param.requires_grad = False
@@ -108,8 +100,8 @@ def train():
 
     loss_threshold = 0.001
     patience = 5
-    best_loss = load_best_loss()
-    print(f"Loaded best loss: {best_loss}")
+    last_loss = load_best_loss()
+    print(f"📉 Loaded best loss: {last_loss:.6f}")
 
     epochs_no_improve = 0
     max_epochs = 1000
@@ -142,29 +134,26 @@ def train():
             running_loss += loss.item()
 
         avg_loss = running_loss / len(dataloader)
-        print(f"Epoch [{epoch}] Loss: {avg_loss:.6f}")
+        print(f"📝 Epoch [{epoch}] Loss: {avg_loss:.6f}")
 
-        if avg_loss < best_loss:
-            best_loss = avg_loss
+        if avg_loss < last_loss:
+            last_loss = avg_loss
             epochs_no_improve = 0
             torch.save(student.state_dict(), "student_model_trained.pth")
-            save_best_loss(best_loss)
-            print(f"New best model saved with loss {best_loss:.6f}")
+            save_best_loss(avg_loss)
+            print(f"💾 New best model saved with loss {avg_loss:.6f}")
         else:
             epochs_no_improve += 1
-            print(f"No improvement for {epochs_no_improve} epoch(s)")
+            print(f"⚠️ No improvement for {epochs_no_improve} epoch(s)")
 
-        if best_loss <= loss_threshold:
-            print(f"Loss threshold {loss_threshold} reached, stopping training.")
-            break
-        if epochs_no_improve >= patience:
-            print(f"No improvement for {patience} epochs, stopping training.")
+        if last_loss <= loss_threshold:
+            print(f"✅ Loss threshold {loss_threshold} reached, stopping training.")
             break
         if epoch >= max_epochs:
-            print(f"Reached max epochs {max_epochs}, stopping training.")
+            print(f"🛑 Reached max epochs {max_epochs}, stopping training.")
             break
 
-    print("Training complete.")
+    print("🎉 Training complete.")
 
 if __name__ == "__main__":
     train()
