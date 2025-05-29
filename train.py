@@ -11,6 +11,7 @@ from models.student_model import StudentNet
 from tqdm import tqdm
 from pytorch_msssim import SSIM
 
+
 class ImageDataset(Dataset):
     def __init__(self, hr_dir, lr_dir, transform_hr=None, transform_lr=None):
         self.hr_dir = hr_dir
@@ -48,6 +49,7 @@ class ImageDataset(Dataset):
 
         return lr_image, hr_image
 
+
 def load_best_loss(filepath="best_loss.txt"):
     if os.path.exists(filepath):
         with open(filepath, "r") as f:
@@ -57,9 +59,11 @@ def load_best_loss(filepath="best_loss.txt"):
                 return float('inf')
     return float('inf')
 
+
 def save_best_loss(loss, filepath="best_loss.txt"):
     with open(filepath, "w") as f:
         f.write(str(loss))
+
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,6 +71,7 @@ def train():
     hr_dir = "data/train/sharp"
     lr_dir = "data/train/blurry"
 
+    # Common transform (resize + to tensor)
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
@@ -74,20 +79,34 @@ def train():
 
     full_dataset = ImageDataset(hr_dir=hr_dir, lr_dir=lr_dir, transform_hr=transform, transform_lr=transform)
 
+    # Use a fixed random seed for reproducibility
     random.seed(42)
     subset_size = min(1000, len(full_dataset))
     subset_indices = random.sample(range(len(full_dataset)), subset_size)
     dataset = Subset(full_dataset, subset_indices)
 
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=8, shuffle=True, num_workers=2, pin_memory=True)
 
     teacher = TeacherNet().to(device)
     student = StudentNet().to(device)
 
+    # Load pretrained weights smartly
     if os.path.exists("student_model_trained.pth"):
-        student.load_state_dict(torch.load("student_model_trained.pth", map_location=device))
-        print("✅ Loaded existing best student model for continued training.")
+        print("⚠️ Found saved model file 'student_model_trained.pth', trying to load...")
+        # Try loading as TeacherNet first (to detect possible file confusion)
+        try:
+            teacher.load_state_dict(torch.load("student_model_trained.pth", map_location=device))
+            print("⚠️ Loaded model weights correspond to TeacherNet. Renaming the file to 'teacher_model_trained.pth'.")
+            os.rename("student_model_trained.pth", "teacher_model_trained.pth")
+        except RuntimeError:
+            # Loading as Teacher failed, try loading directly as Student model
+            try:
+                student.load_state_dict(torch.load("student_model_trained.pth", map_location=device))
+                print("✅ Loaded existing student model weights successfully for continued training.")
+            except RuntimeError as e:
+                print(f"❌ Failed to load student model weights: {e}")
 
+    # Freeze teacher parameters
     for param in teacher.parameters():
         param.requires_grad = False
     teacher.eval()
@@ -123,10 +142,15 @@ def train():
 
             student_outputs = student(lr_imgs)
 
+            # Resize teacher_outputs to match student_outputs size for distillation loss
+            if teacher_outputs.shape != student_outputs.shape:
+                teacher_outputs = nn.functional.interpolate(teacher_outputs, size=student_outputs.shape[2:], mode='bilinear', align_corners=False)
+
             loss_reconstruction = criterion_reconstruction(student_outputs, hr_imgs)
             loss_distillation = criterion_distillation(student_outputs, teacher_outputs)
             loss_ssim = 1 - criterion_ssim(student_outputs, hr_imgs)
 
+            # Weighted sum of losses
             loss = 0.5 * loss_reconstruction + 0.2 * loss_distillation + 0.3 * loss_ssim
             loss.backward()
             optimizer.step()
@@ -149,11 +173,17 @@ def train():
         if last_loss <= loss_threshold:
             print(f"✅ Loss threshold {loss_threshold} reached, stopping training.")
             break
+
+        if epochs_no_improve >= patience:
+            print(f"⚠️ Early stopping: no improvement for {patience} epochs.")
+            break
+
         if epoch >= max_epochs:
             print(f"🛑 Reached max epochs {max_epochs}, stopping training.")
             break
 
     print("🎉 Training complete.")
+
 
 if __name__ == "__main__":
     train()
