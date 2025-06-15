@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torchvision import transforms, models
+from torch.nn import functional as F
 from PIL import Image
 import os
 from models.student_model import StudentNet
@@ -79,6 +80,30 @@ def calculate_ssim(img1, img2):
         data_range=img2.max() - img2.min()
     )
 
+# 🔹 Perceptual Loss module using VGG16 features
+class PerceptualLoss(torch.nn.Module):
+    def __init__(self, device):
+        super().__init__()
+        vgg = models.vgg16(pretrained=True).features.to(device).eval()
+        for param in vgg.parameters():
+            param.requires_grad = False
+        # Use only first few layers (e.g., till relu2_2) to compute perceptual loss
+        self.features = torch.nn.Sequential(*list(vgg.children())[:9])
+        self.device = device
+
+    def forward(self, x, y):
+        # x, y: tensors with shape (B,3,H,W), expected range [0,1]
+        # Normalize using ImageNet mean/std
+        mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1,3,1,1)
+        std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1,3,1,1)
+        x_norm = (x - mean) / std
+        y_norm = (y - mean) / std
+
+        feat_x = self.features(x_norm)
+        feat_y = self.features(y_norm)
+
+        return F.l1_loss(feat_x, feat_y)
+
 # 🔹 Main evaluation logic
 def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,7 +113,7 @@ def evaluate():
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor(),
+        transforms.ToTensor(),  # [0,1]
     ])
 
     dataset = PairedImageDataset(lr_dir, hr_dir, transform_lr=transform, transform_hr=transform)
@@ -102,7 +127,10 @@ def evaluate():
     student.load_state_dict(state_dict)
     student.eval()
 
+    perceptual_loss_fn = PerceptualLoss(device)
+
     ssim_scores = []
+    perceptual_losses = []
 
     with torch.no_grad():
         for lr_img, hr_img in tqdm(test_loader, desc="Evaluating"):
@@ -110,6 +138,10 @@ def evaluate():
             hr_img = hr_img.to(device)
 
             output = student(lr_img)
+
+            # Perceptual loss (on tensors)
+            p_loss = perceptual_loss_fn(output, hr_img).item()
+            perceptual_losses.append(p_loss)
 
             # Convert tensors to numpy images (H,W,C)
             output_np = output.squeeze(0).cpu().numpy().transpose(1, 2, 0)
@@ -128,7 +160,9 @@ def evaluate():
             ssim_scores.append(ssim_val)
 
     avg_ssim = np.mean(ssim_scores)
+    avg_perceptual = np.mean(perceptual_losses)
     print(f"\n✅ Average SSIM on test set: {avg_ssim:.4f}")
+    print(f"✅ Average Perceptual Loss on test set: {avg_perceptual:.6f}")
 
 if __name__ == "__main__":
     evaluate()

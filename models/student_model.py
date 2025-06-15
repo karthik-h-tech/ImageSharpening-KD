@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 import torch.nn.functional as F
+from torchvision import transforms
 
 class StudentNet(nn.Module):
     def __init__(self):
@@ -43,11 +44,9 @@ class StudentNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.final = nn.Sequential(
-            nn.Conv2d(16, 3, kernel_size=3, padding=1),
-            nn.Sigmoid()  # output range [0, 1]
-        )
-    
+        # Final conv outputs 3 channels (no Sigmoid, output will be denormalized later)
+        self.final = nn.Conv2d(16, 3, kernel_size=3, padding=1)
+
     def crop_to_match(self, src, tgt):
         """
         Center-crop src tensor to match the spatial size of tgt tensor.
@@ -86,3 +85,78 @@ class StudentNet(nn.Module):
         x = self.final(x)
 
         return x
+
+
+def distillation_loss(student_output, teacher_output, criterion_pix=torch.nn.L1Loss(), alpha=0.7):
+    """
+    Compute distillation loss between student and teacher outputs.
+
+    Args:
+        student_output: Output tensor from student network, range [0,1]
+        teacher_output: Output tensor from teacher network, range [0,1]
+        criterion_pix: Pixel-wise loss function (default: L1Loss)
+        alpha: weight for pixel loss (default 0.7), (1-alpha) for other losses if added
+
+    Returns:
+        Loss scalar tensor
+    """
+    # Pixel-wise L1 loss between student and teacher images
+    loss_pix = criterion_pix(student_output, teacher_output)
+
+    # You can add other losses here (e.g., perceptual loss, feature losses) for better distillation
+    
+    return loss_pix
+
+
+# Normalization/denormalization utilities (match teacher)
+def get_normalize():
+    return torch.nn.Sequential(
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    )
+
+def denormalize(tensor):
+    mean = torch.tensor([0.5, 0.5, 0.5], device=tensor.device).view(1, 3, 1, 1)
+    std = torch.tensor([0.5, 0.5, 0.5], device=tensor.device).view(1, 3, 1, 1)
+    return tensor * std + mean
+
+
+# Example training step function showing distillation usage
+def train_step(student_model, teacher_model, optimizer, input_images):
+    """
+    Perform one training step for the student model distilling from teacher model.
+
+    Args:
+        student_model: the StudentNet instance
+        teacher_model: pretrained and eval teacher model
+        optimizer: optimizer for student model parameters
+        input_images: input batch tensor [B, 3, H, W], normalized [0,1]
+
+    Returns:
+        loss value
+    """
+    student_model.train()
+    with torch.no_grad():
+        teacher_model.eval()
+        teacher_outputs = teacher_model(input_images)  # teacher prediction
+
+    # Forward pass student
+    student_outputs = student_model(input_images)
+
+    # Compute distillation loss
+    loss = distillation_loss(student_outputs, teacher_outputs)
+
+    # Backpropagation
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    return loss.item()
+
+# In your training loop, ensure you normalize inputs and denormalize outputs for both teacher and student.
+# Example usage:
+#   input_tensor = normalize(transform(image)).unsqueeze(0).to(device)
+#   teacher_out = teacher_model(input_tensor)
+#   student_out = student_model(input_tensor)
+#   teacher_out = denormalize(teacher_out)
+#   student_out = denormalize(student_out)
+#   loss = distillation_loss(student_out, teacher_out)
