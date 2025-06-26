@@ -30,6 +30,7 @@ def denormalize(tensor):
     return tensor * std + mean
 
 def load_model(weight_path, device):
+    print("📦 Initializing Restormer model...")
     model = Restormer(
         inp_channels=3,
         out_channels=3,
@@ -42,8 +43,12 @@ def load_model(weight_path, device):
         LayerNorm_type='WithBias',
         dual_pixel_task=False
     )
+    print("✅ Model created.")
 
+    print("📂 Loading weights...")
     checkpoint = torch.load(weight_path, map_location=device)
+    print("✅ Weights loaded.")
+
     state_dict = checkpoint.get('params', checkpoint.get('state_dict', checkpoint))
 
     clean_dict = OrderedDict()
@@ -52,27 +57,36 @@ def load_model(weight_path, device):
         clean_dict[new_k] = v
 
     model.load_state_dict(clean_dict, strict=False)
+    print("✅ Weights loaded into model.")
+
     model.eval().to(device)
     return model
 
 def test_single_image(image_path, weight_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"🖥️ Using device: {device}")
+    if device.type != 'cuda':
+        print("⚠️ CUDA (GPU) not available. Using CPU instead.")
 
+    print("🚀 Loading model...")
     model = load_model(weight_path, device)
 
+    print("🖼️ Loading input image...")
     image = Image.open(image_path).convert("RGB")
     padded, orig_w, orig_h = pad_image(image)
+
+    print("📐 Image padded. Shape:", padded.size)
 
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
-
     input_tensor = transform(padded).unsqueeze(0).to(device)
 
+    print("🤖 Running inference...")
     with torch.no_grad():
         output = model(input_tensor)
+    print("✅ Inference complete.")
 
     output = denormalize(output)
     output = torch.clamp(output, 0, 1)
@@ -83,14 +97,13 @@ def test_single_image(image_path, weight_path):
     save_image(output_cropped, "restored_output.png")
     print("✅ Saved output image: restored_output.png")
 
-    # Convert to NumPy for display
     input_np = input_cropped.squeeze().permute(1, 2, 0).cpu().numpy()
     output_np = output_cropped.squeeze().permute(1, 2, 0).cpu().numpy()
 
     input_np = np.clip(input_np, 0, 1)
     output_np = np.clip(output_np, 0, 1)
 
-    # Show side-by-side
+    print("📊 Displaying side-by-side comparison...")
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
     axs[0].imshow(input_np)
     axs[0].set_title("Input")
@@ -104,4 +117,7 @@ def test_single_image(image_path, weight_path):
     plt.show()
 
 if __name__ == "__main__":
-    test_single_image("data/val/inputC/1P0A0894.png", "Restormer/Defocus_Deblurring/pretrained_models/single_image_defocus_deblurring.pth")
+    test_single_image(
+        "safe_input.jpg",
+        "Restormer/Defocus_Deblurring/pretrained_models/single_image_defocus_deblurring.pth"
+    )
