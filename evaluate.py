@@ -1,168 +1,146 @@
-import torch
-from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms, models
-from torch.nn import functional as F
-from PIL import Image
 import os
-from models.student_model import StudentNet
-from skimage.metrics import structural_similarity as ssim_func
+import torch
 import numpy as np
+from PIL import Image
 from tqdm import tqdm
-import cv2  # For resizing images if needed
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms, models
+import torch.nn.functional as F
+import cv2
+from skimage.metrics import structural_similarity as ssim_func
+from models.student_model import StudentNet
 
-# 🔹 Paired dataset for blurry → sharp mapping
+
+# 🔹 Dataset for paired blurry and sharp images
 class PairedImageDataset(Dataset):
     def __init__(self, lr_dir, hr_dir, transform_lr=None, transform_hr=None):
-        self.lr_images = []
-        self.hr_images = []
         self.transform_lr = transform_lr
         self.transform_hr = transform_hr
 
-        for root, _, files in os.walk(lr_dir):
-            for f in files:
-                if f.lower().endswith(('png', 'jpg', 'jpeg')):
-                    self.lr_images.append(os.path.join(root, f))
+        lr_files = sorted([
+            os.path.join(root, f)
+            for root, _, files in os.walk(lr_dir)
+            for f in files if f.lower().endswith(('png', 'jpg', 'jpeg'))
+        ])
+        hr_files = sorted([
+            os.path.join(root, f)
+            for root, _, files in os.walk(hr_dir)
+            for f in files if f.lower().endswith(('png', 'jpg', 'jpeg'))
+        ])
 
-        for root, _, files in os.walk(hr_dir):
-            for f in files:
-                if f.lower().endswith(('png', 'jpg', 'jpeg')):
-                    self.hr_images.append(os.path.join(root, f))
+        lr_dict = {os.path.basename(path): path for path in lr_files}
+        hr_dict = {os.path.basename(path): path for path in hr_files}
+        common = sorted(set(lr_dict.keys()) & set(hr_dict.keys()))
 
-        lr_dict = {os.path.basename(path): path for path in self.lr_images}
-        hr_dict = {os.path.basename(path): path for path in self.hr_images}
-        common_filenames = sorted(set(lr_dict.keys()) & set(hr_dict.keys()))
-
-        self.lr_images = [lr_dict[f] for f in common_filenames]
-        self.hr_images = [hr_dict[f] for f in common_filenames]
+        self.lr_images = [lr_dict[f] for f in common]
+        self.hr_images = [hr_dict[f] for f in common]
 
     def __len__(self):
         return len(self.lr_images)
 
     def __getitem__(self, idx):
-        lr_img = Image.open(self.lr_images[idx]).convert('RGB')
-        hr_img = Image.open(self.hr_images[idx]).convert('RGB')
+        lr = Image.open(self.lr_images[idx]).convert('RGB')
+        hr = Image.open(self.hr_images[idx]).convert('RGB')
 
         if self.transform_lr:
-            lr_img = self.transform_lr(lr_img)
+            lr = self.transform_lr(lr)
         if self.transform_hr:
-            hr_img = self.transform_hr(hr_img)
+            hr = self.transform_hr(hr)
+        return lr, hr
 
-        return lr_img, hr_img
 
-# 🔹 Remove training prefixes if any
-def remove_prefix(state_dict, prefix='model.'):
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        new_key = k[len(prefix):] if k.startswith(prefix) else k
-        new_state_dict[new_key] = v
-    return new_state_dict
+# 🔹 VGG-based Perceptual Loss
+class PerceptualLoss(torch.nn.Module):
+    def __init__(self, device):
+        super().__init__()
+        vgg = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features[:9].to(device).eval()
+        for p in vgg.parameters():
+            p.requires_grad = False
+        self.vgg = vgg
+        self.device = device
 
-# 🔹 Ensure image has minimum size 7x7 for SSIM
+    def forward(self, x, y):
+        mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
+        x = (x - mean) / std
+        y = (y - mean) / std
+        return F.l1_loss(self.vgg(x), self.vgg(y))
+
+
+# 🔹 Safe SSIM
 def ensure_min_size(img_np, min_size=7):
     h, w = img_np.shape[:2]
     if h < min_size or w < min_size:
         img_np = cv2.resize(img_np, (max(w, min_size), max(h, min_size)), interpolation=cv2.INTER_LINEAR)
     return img_np
 
-# 🔹 Calculate SSIM with safe window size and channel axis
+
 def calculate_ssim(img1, img2):
+    img1 = ensure_min_size(img1)
+    img2 = ensure_min_size(img2)
     min_dim = min(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     win_size = min(7, min_dim)
     if win_size % 2 == 0:
-        win_size -= 1  # make it odd
+        win_size -= 1
+    return ssim_func(img1, img2, channel_axis=2, win_size=win_size, data_range=img2.max() - img2.min())
 
-    return ssim_func(
-        img1,
-        img2,
-        multichannel=True,
-        channel_axis=2,
-        win_size=win_size,
-        data_range=img2.max() - img2.min()
-    )
 
-# 🔹 Perceptual Loss module using VGG16 features
-class PerceptualLoss(torch.nn.Module):
-    def __init__(self, device):
-        super().__init__()
-        vgg = models.vgg16(pretrained=True).features.to(device).eval()
-        for param in vgg.parameters():
-            param.requires_grad = False
-        # Use only first few layers (e.g., till relu2_2) to compute perceptual loss
-        self.features = torch.nn.Sequential(*list(vgg.children())[:9])
-        self.device = device
+# 🔹 Load student model
+def load_student_model(device, path="student_model_trained.pth"):
+    model = StudentNet().to(device)
+    ckpt = torch.load(path, map_location=device)
+    state_dict = ckpt.get("model") or ckpt.get("state_dict") or ckpt
+    cleaned_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    model.load_state_dict(cleaned_dict)
+    model.eval()
+    return model
 
-    def forward(self, x, y):
-        # x, y: tensors with shape (B,3,H,W), expected range [0,1]
-        # Normalize using ImageNet mean/std
-        mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1,3,1,1)
-        std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1,3,1,1)
-        x_norm = (x - mean) / std
-        y_norm = (y - mean) / std
 
-        feat_x = self.features(x_norm)
-        feat_y = self.features(y_norm)
-
-        return F.l1_loss(feat_x, feat_y)
-
-# 🔹 Main evaluation logic
+# 🔹 Main Evaluation
 def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("🖥️ Device:", device)
 
-    lr_dir = 'data/train/blurry'   # Low-res / blurry images
-    hr_dir = 'data/train/sharp'    # Ground truth sharp images
+    lr_dir = "data/train/blurry"
+    hr_dir = "data/train/sharp"
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor(),  # [0,1]
+        transforms.ToTensor(),  # stays in [0,1]
     ])
 
-    dataset = PairedImageDataset(lr_dir, hr_dir, transform_lr=transform, transform_hr=transform)
-    test_loader = DataLoader(dataset, batch_size=1, shuffle=False)
+    dataset = PairedImageDataset(lr_dir, hr_dir, transform, transform)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    student = StudentNet().to(device)
-    checkpoint = torch.load('student_model_trained.pth', map_location=device)
-
-    state_dict = checkpoint.get('model') or checkpoint.get('state_dict') or checkpoint
-    state_dict = remove_prefix(state_dict)
-    student.load_state_dict(state_dict)
-    student.eval()
-
+    student = load_student_model(device)
     perceptual_loss_fn = PerceptualLoss(device)
 
     ssim_scores = []
     perceptual_losses = []
 
     with torch.no_grad():
-        for lr_img, hr_img in tqdm(test_loader, desc="Evaluating"):
-            lr_img = lr_img.to(device)
-            hr_img = hr_img.to(device)
+        for lr, hr in tqdm(loader, desc="📊 Evaluating"):
+            lr, hr = lr.to(device), hr.to(device)
 
-            output = student(lr_img)
+            out = student(lr)
 
-            # Perceptual loss (on tensors)
-            p_loss = perceptual_loss_fn(output, hr_img).item()
+            # Perceptual loss
+            p_loss = perceptual_loss_fn(out, hr).item()
             perceptual_losses.append(p_loss)
 
-            # Convert tensors to numpy images (H,W,C)
-            output_np = output.squeeze(0).cpu().numpy().transpose(1, 2, 0)
-            hr_np = hr_img.squeeze(0).cpu().numpy().transpose(1, 2, 0)
+            # Convert to numpy for SSIM
+            out_np = out.squeeze().cpu().clamp(0, 1).numpy().transpose(1, 2, 0)
+            hr_np = hr.squeeze().cpu().clamp(0, 1).numpy().transpose(1, 2, 0)
 
-            # Ensure minimum size
-            output_np = ensure_min_size(output_np)
-            hr_np = ensure_min_size(hr_np)
+            if out_np.shape != hr_np.shape:
+                out_np = cv2.resize(out_np, (hr_np.shape[1], hr_np.shape[0]), interpolation=cv2.INTER_LINEAR)
 
-            # Resize output_np to match hr_np shape if needed
-            if output_np.shape != hr_np.shape:
-                output_np = cv2.resize(output_np, (hr_np.shape[1], hr_np.shape[0]), interpolation=cv2.INTER_LINEAR)
+            ssim_score = calculate_ssim(out_np, hr_np)
+            ssim_scores.append(ssim_score)
 
-            # Calculate SSIM safely
-            ssim_val = calculate_ssim(output_np, hr_np)
-            ssim_scores.append(ssim_val)
+    print("\n✅ Avg SSIM:", np.mean(ssim_scores))
+    print("✅ Avg Perceptual Loss:", np.mean(perceptual_losses))
 
-    avg_ssim = np.mean(ssim_scores)
-    avg_perceptual = np.mean(perceptual_losses)
-    print(f"\n✅ Average SSIM on test set: {avg_ssim:.4f}")
-    print(f"✅ Average Perceptual Loss on test set: {avg_perceptual:.6f}")
 
 if __name__ == "__main__":
     evaluate()

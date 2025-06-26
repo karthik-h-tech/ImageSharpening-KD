@@ -1,38 +1,44 @@
 import os
 import shutil
-import random
+import zipfile
 
-def split_train_test(source_dir, train_dir, test_dir, test_ratio=0.2):
-    os.makedirs(train_dir, exist_ok=True)
-    os.makedirs(test_dir, exist_ok=True)
+# Temporary extraction directory
+download_dir = 'datasets_tmp'
+os.makedirs(download_dir, exist_ok=True)
 
-    classes = [d for d in os.listdir(source_dir) if os.path.isdir(os.path.join(source_dir, d))]
+# Final dataset directories
+input_dir = 'data/inputc'
+target_dir = 'data/target'
+os.makedirs(input_dir, exist_ok=True)
+os.makedirs(target_dir, exist_ok=True)
 
-    for cls in classes:
-        cls_source = os.path.join(source_dir, cls)
-        cls_train = os.path.join(train_dir, cls)
-        cls_test = os.path.join(test_dir, cls)
+# Path to the manually downloaded train.zip
+train_zip_path = 'train.zip'
 
-        os.makedirs(cls_train, exist_ok=True)
-        os.makedirs(cls_test, exist_ok=True)
+# Ensure the train.zip file exists
+if not os.path.exists(train_zip_path):
+    raise FileNotFoundError("❌ train.zip not found. Please place it in the project directory.")
 
-        images = [f for f in os.listdir(cls_source) if os.path.isfile(os.path.join(cls_source, f))]
-        random.shuffle(images)
+# Extract train.zip
+print("📦 Extracting train.zip...")
+with zipfile.ZipFile(train_zip_path, 'r') as zip_ref:
+    zip_ref.extractall(download_dir)
 
-        test_count = int(len(images) * test_ratio)
-        test_images = images[:test_count]
-        train_images = images[test_count:]
+# Move blur → inputc and sharp → target
+blur_path = os.path.join(download_dir, 'train', 'blur')
+sharp_path = os.path.join(download_dir, 'train', 'sharp')
 
-        for img in train_images:
-            shutil.copy2(os.path.join(cls_source, img), os.path.join(cls_train, img))
+if os.path.exists(blur_path):
+    for file in os.listdir(blur_path):
+        shutil.move(os.path.join(blur_path, file), os.path.join(input_dir, file))
 
-        for img in test_images:
-            shutil.copy2(os.path.join(cls_source, img), os.path.join(cls_test, img))
+if os.path.exists(sharp_path):
+    for file in os.listdir(sharp_path):
+        shutil.move(os.path.join(sharp_path, file), os.path.join(target_dir, file))
 
-    print(f"Dataset split completed. Train samples and test samples are created in {train_dir} and {test_dir} respectively.")
+# Cleanup temporary extraction folder
+shutil.rmtree(download_dir)
 
-if __name__ == "__main__":
-    source_dir = "data/train/sharp/Sign-Language-Digits-Dataset-master/Dataset"
-    train_dir = "data/train_split"
-    test_dir = "data/test"
-    split_train_test(source_dir, train_dir, test_dir)
+print("✅ Dataset ready:")
+print("   🔸 Blurry images → data/inputc")
+print("   🔸 Sharp images  → data/target")
