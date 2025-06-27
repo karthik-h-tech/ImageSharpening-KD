@@ -1,7 +1,16 @@
+# Core ML
 torch
 torchvision
-matplotlib
+
+# Data handling and image ops
 numpy
 opencv-python
+Pillow
 scikit-image
+
+# Visualization and tracking
+matplotlib
 tqdm
+
+# Optional but helpful
+scipy  # useful for metrics or pre-processing
