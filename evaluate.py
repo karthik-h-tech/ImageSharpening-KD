@@ -1,7 +1,7 @@
 import os
 import torch
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, models
@@ -10,6 +10,8 @@ import cv2
 from skimage.metrics import structural_similarity as ssim_func
 from models.student_model import StudentNet
 
+# 🔧 Handle truncated images
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # 🔹 Dataset for paired blurry and sharp images
 class PairedImageDataset(Dataset):
@@ -39,14 +41,19 @@ class PairedImageDataset(Dataset):
         return len(self.lr_images)
 
     def __getitem__(self, idx):
-        lr = Image.open(self.lr_images[idx]).convert('RGB')
-        hr = Image.open(self.hr_images[idx]).convert('RGB')
+        try:
+            lr = Image.open(self.lr_images[idx]).convert('RGB')
+            hr = Image.open(self.hr_images[idx]).convert('RGB')
 
-        if self.transform_lr:
-            lr = self.transform_lr(lr)
-        if self.transform_hr:
-            hr = self.transform_hr(hr)
-        return lr, hr
+            if self.transform_lr:
+                lr = self.transform_lr(lr)
+            if self.transform_hr:
+                hr = self.transform_hr(hr)
+
+            return lr, hr
+        except Exception as e:
+            print(f"⚠️ Skipping corrupted image pair: {self.lr_images[idx]} | Error: {e}")
+            return self.__getitem__((idx + 1) % len(self.lr_images))
 
 
 # 🔹 VGG-based Perceptual Loss
@@ -74,7 +81,6 @@ def ensure_min_size(img_np, min_size=7):
         img_np = cv2.resize(img_np, (max(w, min_size), max(h, min_size)), interpolation=cv2.INTER_LINEAR)
     return img_np
 
-
 def calculate_ssim(img1, img2):
     img1 = ensure_min_size(img1)
     img2 = ensure_min_size(img2)
@@ -101,8 +107,8 @@ def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("🖥️ Device:", device)
 
-    lr_dir = "data/train/blurry"
-    hr_dir = "data/train/sharp"
+    lr_dir = "data/inputc"
+    hr_dir = "data/target"
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
@@ -121,7 +127,6 @@ def evaluate():
     with torch.no_grad():
         for lr, hr in tqdm(loader, desc="📊 Evaluating"):
             lr, hr = lr.to(device), hr.to(device)
-
             out = student(lr)
 
             # Perceptual loss
