@@ -55,8 +55,13 @@ class PairedImageDataset(Dataset):
             print(f"⚠️ Skipping corrupted image pair: {self.lr_images[idx]} | Error: {e}")
             return self.__getitem__((idx + 1) % len(self.lr_images))
 
+# 🔹 Denormalize
+def denormalize(tensor):
+    mean = torch.tensor([0.485, 0.456, 0.406], device=tensor.device).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225], device=tensor.device).view(1, 3, 1, 1)
+    return tensor * std + mean
 
-# 🔹 VGG-based Perceptual Loss
+# 🔹 Perceptual Loss with denormalization
 class PerceptualLoss(torch.nn.Module):
     def __init__(self, device):
         super().__init__()
@@ -67,12 +72,11 @@ class PerceptualLoss(torch.nn.Module):
         self.device = device
 
     def forward(self, x, y):
-        mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
-        std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
-        x = (x - mean) / std
-        y = (y - mean) / std
+        x = denormalize(x)
+        y = denormalize(y)
+        x = F.interpolate(x, size=(224, 224), mode='bilinear', align_corners=False)
+        y = F.interpolate(y, size=(224, 224), mode='bilinear', align_corners=False)
         return F.l1_loss(self.vgg(x), self.vgg(y))
-
 
 # 🔹 Safe SSIM
 def ensure_min_size(img_np, min_size=7):
@@ -88,8 +92,7 @@ def calculate_ssim(img1, img2):
     win_size = min(7, min_dim)
     if win_size % 2 == 0:
         win_size -= 1
-    return ssim_func(img1, img2, channel_axis=2, win_size=win_size, data_range=img2.max() - img2.min())
-
+    return ssim_func(img1, img2, channel_axis=2, win_size=win_size, data_range=1.0)
 
 # 🔹 Load student model
 def load_student_model(device, path="student_model_trained.pth"):
@@ -101,18 +104,17 @@ def load_student_model(device, path="student_model_trained.pth"):
     model.eval()
     return model
 
-
 # 🔹 Main Evaluation
 def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("🖥️ Device:", device)
 
-    lr_dir = "data/inputc"
-    hr_dir = "data/target"
+    lr_dir = "data/inputC_crops"
+    hr_dir = "data/target_crops"
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor(),  # stays in [0,1]
+        transforms.ToTensor(),  # Normalized later in loss
     ])
 
     dataset = PairedImageDataset(lr_dir, hr_dir, transform, transform)
@@ -127,15 +129,15 @@ def evaluate():
     with torch.no_grad():
         for lr, hr in tqdm(loader, desc="📊 Evaluating"):
             lr, hr = lr.to(device), hr.to(device)
-            out = student(lr)
+            out = torch.sigmoid(student(lr))  # ✅ Add sigmoid
 
-            # Perceptual loss
+            # Denormalize both for perceptual loss
             p_loss = perceptual_loss_fn(out, hr).item()
             perceptual_losses.append(p_loss)
 
-            # Convert to numpy for SSIM
-            out_np = out.squeeze().cpu().clamp(0, 1).numpy().transpose(1, 2, 0)
-            hr_np = hr.squeeze().cpu().clamp(0, 1).numpy().transpose(1, 2, 0)
+            # Clamp and convert to NumPy for SSIM
+            out_np = denormalize(out).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
+            hr_np = denormalize(hr).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
 
             if out_np.shape != hr_np.shape:
                 out_np = cv2.resize(out_np, (hr_np.shape[1], hr_np.shape[0]), interpolation=cv2.INTER_LINEAR)
@@ -145,7 +147,6 @@ def evaluate():
 
     print("\n✅ Avg SSIM:", np.mean(ssim_scores))
     print("✅ Avg Perceptual Loss:", np.mean(perceptual_losses))
-
 
 if __name__ == "__main__":
     evaluate()
