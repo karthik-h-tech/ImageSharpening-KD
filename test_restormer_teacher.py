@@ -1,123 +1,123 @@
 import os
 import sys
 import torch
+import torch.nn.functional as F
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
-from torchvision import transforms
-from torchvision.utils import save_image
-from collections import OrderedDict
+from skimage.metrics import peak_signal_noise_ratio as compare_psnr
+from skimage.metrics import structural_similarity as compare_ssim
 
+# -------------------------------
 # Add Restormer root to sys.path
+# -------------------------------
 restormer_root = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Restormer'))
 if restormer_root not in sys.path:
     sys.path.insert(0, restormer_root)
 
 from basicsr.models.archs.restormer_arch import Restormer
 
-def pad_image(img):
-    """Pad image to nearest multiple of 8 (Restormer requirement)."""
-    w, h = img.size
-    pad_w = (8 - w % 8) % 8
-    pad_h = (8 - h % 8) % 8
-    new_img = Image.new("RGB", (w + pad_w, h + pad_h), (0, 0, 0))
-    new_img.paste(img, (0, 0))
-    return new_img, w, h
+# ------------------------
+# Helper functions
+# ------------------------
+def load_img(filepath):
+    img = Image.open(filepath).convert('RGB')
+    img = np.float32(img) / 255.0
+    return img
 
-def denormalize(tensor):
-    mean = torch.tensor([0.5, 0.5, 0.5], device=tensor.device).view(1, 3, 1, 1)
-    std = torch.tensor([0.5, 0.5, 0.5], device=tensor.device).view(1, 3, 1, 1)
-    return tensor * std + mean
+def save_img(filepath, img):
+    img = np.clip(img, 0, 1)
+    img = (img * 255).round().astype(np.uint8)
+    Image.fromarray(img).save(filepath)
 
-def load_model(weight_path, device):
-    print("📦 Initializing Restormer model...")
-    model = Restormer(
-        inp_channels=3,
-        out_channels=3,
-        dim=48,
-        num_blocks=[4, 6, 6, 8],
-        num_refinement_blocks=4,
-        heads=[1, 2, 4, 8],
-        ffn_expansion_factor=2.66,
-        bias=False,
-        LayerNorm_type='WithBias',
-        dual_pixel_task=False
-    )
-    print("✅ Model created.")
+# ------------------------
+# CONFIG
+# ------------------------
+input_path = 'data/test/input/GOPR0384_11_00-000001.png'
+gt_path = 'data/test/target/GOPR0384_11_00-000001.png'  # ground truth image
+result_dir = 'results'
+weights_path = 'Restormer/Motion_Deblurring/pretrained_models/motion_deblurring.pth'
+os.makedirs(result_dir, exist_ok=True)
 
-    print("📂 Loading weights...")
-    checkpoint = torch.load(weight_path, map_location=device)
-    print("✅ Weights loaded.")
+# ------------------------
+# LOAD MODEL
+# ------------------------
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f'🚀 Using device: {device}')
 
-    state_dict = checkpoint.get('params', checkpoint.get('state_dict', checkpoint))
+model = Restormer(
+    inp_channels=3,
+    out_channels=3,
+    dim=48,
+    num_blocks=[4, 6, 6, 8],
+    num_refinement_blocks=4,
+    heads=[1, 2, 4, 8],
+    ffn_expansion_factor=2.66,
+    bias=False,
+    LayerNorm_type='WithBias',
+    dual_pixel_task=False
+).to(device)
 
-    clean_dict = OrderedDict()
-    for k, v in state_dict.items():
-        new_k = k.replace('module.', '') if k.startswith('module.') else k
-        clean_dict[new_k] = v
+checkpoint = torch.load(weights_path, map_location=device)
+model.load_state_dict(checkpoint.get('params', checkpoint))
+model.eval()
 
-    model.load_state_dict(clean_dict, strict=False)
-    print("✅ Weights loaded into model.")
+factor = 8
 
-    model.eval().to(device)
-    return model
+# ------------------------
+# PROCESS IMAGE
+# ------------------------
+print(f"🖼️ Processing image: {input_path}")
+img_np = load_img(input_path)
+img_tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0).to(device)
 
-def test_single_image(image_path, weight_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"🖥️ Using device: {device}")
-    if device.type != 'cuda':
-        print("⚠️ CUDA (GPU) not available. Using CPU instead.")
+# Pad to multiple of 8
+h, w = img_tensor.shape[2], img_tensor.shape[3]
+H, W = ((h + factor) // factor) * factor, ((w + factor) // factor) * factor
+padh = H - h if h % factor != 0 else 0
+padw = W - w if w % factor != 0 else 0
+img_padded = F.pad(img_tensor, (0, padw, 0, padh), 'reflect')
 
-    print("🚀 Loading model...")
-    model = load_model(weight_path, device)
+# Inference
+with torch.no_grad():
+    restored = model(img_padded)
+restored = restored[:, :, :h, :w]
+restored = torch.clamp(restored, 0, 1).cpu().permute(0, 2, 3, 1).squeeze(0).numpy()
 
-    print("🖼️ Loading input image...")
-    image = Image.open(image_path).convert("RGB")
-    padded, orig_w, orig_h = pad_image(image)
+# ------------------------
+# SAVE OUTPUT
+# ------------------------
+filename = os.path.splitext(os.path.basename(input_path))[0] + '.png'
+save_path = os.path.join(result_dir, filename)
+save_img(save_path, restored)
+print(f"✅ Saved restored image to: {save_path}")
 
-    print("📐 Image padded. Shape:", padded.size)
+# ------------------------
+# COMPUTE METRICS
+# ------------------------
+if os.path.exists(gt_path):
+    gt_np = load_img(gt_path)
+    psnr_val = compare_psnr(gt_np, restored, data_range=1)
+    ssim_val = compare_ssim(gt_np, restored, channel_axis=-1, data_range=1)
+    print(f"📈 PSNR: {psnr_val:.2f} dB")
+    print(f"📈 SSIM: {ssim_val:.4f}")
+else:
+    print(f"⚠️ Ground truth file not found at: {gt_path}")
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
-    ])
-    input_tensor = transform(padded).unsqueeze(0).to(device)
+# ------------------------
+# DISPLAY SIDE BY SIDE
+# ------------------------
+plt.figure(figsize=(12,6))
 
-    print("🤖 Running inference...")
-    with torch.no_grad():
-        output = model(input_tensor)
-    print("✅ Inference complete.")
+plt.subplot(1,2,1)
+plt.imshow(img_np)
+plt.title("Input (Motion Blurred)")
+plt.axis('off')
 
-    output = denormalize(output)
-    output = torch.clamp(output, 0, 1)
+plt.subplot(1,2,2)
+plt.imshow(restored)
+plt.title("Restored (Deblurred)")
+plt.axis('off')
 
-    output_cropped = output[:, :, :orig_h, :orig_w]
-    input_cropped = denormalize(input_tensor)[:, :, :orig_h, :orig_w]
-
-    save_image(output_cropped, "restored_output.png")
-    print("✅ Saved output image: restored_output.png")
-
-    input_np = input_cropped.squeeze().permute(1, 2, 0).cpu().numpy()
-    output_np = output_cropped.squeeze().permute(1, 2, 0).cpu().numpy()
-
-    input_np = np.clip(input_np, 0, 1)
-    output_np = np.clip(output_np, 0, 1)
-
-    print("📊 Displaying side-by-side comparison...")
-    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-    axs[0].imshow(input_np)
-    axs[0].set_title("Input")
-    axs[0].axis('off')
-
-    axs[1].imshow(output_np)
-    axs[1].set_title("Restored")
-    axs[1].axis('off')
-
-    plt.tight_layout()
-    plt.show()
-
-if __name__ == "__main__":
-    test_single_image(
-        "data/inputc/0001.png",
-        "Restormer/Defocus_Deblurring/pretrained_models/single_image_defocus_deblurring.pth"
-    )
+plt.tight_layout()
+plt.show()
