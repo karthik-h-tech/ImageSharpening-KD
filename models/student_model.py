@@ -1,92 +1,89 @@
 import torch
 import torch.nn as nn
-import torchvision.models as models
 from torchvision import transforms
 
-
-class StudentNet(nn.Module):
-    def __init__(self):
-        super(StudentNet, self).__init__()
-
-        # Pretrained MobileNetV2 as encoder
-        mobilenet = models.mobilenet_v2(pretrained=True).features
-
-        # Encoder layers
-        self.enc1 = mobilenet[0:2]    # Output: 16 channels
-        self.enc2 = mobilenet[2:4]    # Output: 24 channels
-        self.enc3 = mobilenet[4:7]    # Output: 32 channels
-        self.enc4 = mobilenet[7:14]   # Output: 96 channels
-
-        # Bottleneck
-        self.bottleneck = nn.Sequential(
-            nn.Conv2d(96, 64, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-
-        # Decoder
-        self.up3 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(64 + 32, 32, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-        self.up2 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(32 + 24, 24, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-        self.up1 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(24 + 16, 16, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-        self.up0 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
-            nn.Conv2d(16, 8, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
-
-        # Final output layer with Tanh to map output to [-1, 1]
-        self.final = nn.Conv2d(8, 3, kernel_size=3, padding=1)
-        self.output_act = nn.Tanh()
-
-    def crop_to_match(self, src, tgt):
-        """Crop src tensor to match spatial size of tgt tensor"""
-        h_diff = src.size(2) - tgt.size(2)
-        w_diff = src.size(3) - tgt.size(3)
-        return src[:, :, h_diff // 2: src.size(2) - (h_diff - h_diff // 2),
-                         w_diff // 2: src.size(3) - (w_diff - w_diff // 2)]
+# === Depthwise Separable Convolution ===
+class DepthwiseSeparableConv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size=3, padding=1, groups=in_ch, bias=False)
+        self.pointwise = nn.Conv2d(in_ch, out_ch, kernel_size=1, bias=False)
+        self.norm = nn.BatchNorm2d(out_ch)  # ✅ Helps convergence and stability
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
+        x = self.depthwise(x)
+        x = self.pointwise(x)
+        x = self.norm(x)
+        return self.relu(x)
+
+# === Safe Crop for Skip Connections ===
+def center_crop(src, target_shape):
+    _, _, h, w = src.shape
+    target_h, target_w = target_shape
+    dh, dw = h - target_h, w - target_w
+    return src[:, :, dh // 2:dh // 2 + target_h, dw // 2:dw // 2 + target_w]
+
+# === Student Network ===
+class StudentNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+
         # Encoder
-        x0 = self.enc1(x)
-        x1 = self.enc2(x0)
-        x2 = self.enc3(x1)
-        x3 = self.enc4(x2)
+        self.enc1 = DepthwiseSeparableConv(3, 4)
+        self.enc2 = DepthwiseSeparableConv(4, 8)
+        self.enc3 = DepthwiseSeparableConv(8, 16)
 
         # Bottleneck
-        x = self.bottleneck(x3)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.bottleneck = DepthwiseSeparableConv(16, 32)
 
-        # Decoder with skip connections
-        x2_cropped = self.crop_to_match(x2, x)
-        x = self.up3(torch.cat([x, x2_cropped], dim=1))
+        # Decoder
+        self.up3 = nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2)
+        self.dec3 = DepthwiseSeparableConv(32, 16)
 
-        x1_cropped = self.crop_to_match(x1, x)
-        x = self.up2(torch.cat([x, x1_cropped], dim=1))
+        self.up2 = nn.ConvTranspose2d(16, 8, kernel_size=2, stride=2)
+        self.dec2 = DepthwiseSeparableConv(16, 8)
 
-        x0_cropped = self.crop_to_match(x0, x)
-        x = self.up1(torch.cat([x, x0_cropped], dim=1))
+        self.up1 = nn.ConvTranspose2d(8, 4, kernel_size=2, stride=2)
+        self.dec1 = DepthwiseSeparableConv(8, 4)
 
-        x = self.up0(x)
-        x = self.final(x)
-        x = self.output_act(x)  # Tanh scales to [-1, 1]
+        self.final = nn.Conv2d(4, 3, kernel_size=1)
+        self.output_act = nn.Sigmoid()  # ✅ Ensures [0, 1] output
 
-        return x
+    def forward(self, x):
+        e1 = self.enc1(x)
+        p1 = self.pool(e1)
 
+        e2 = self.enc2(p1)
+        p2 = self.pool(e2)
 
-# Normalization for input
+        e3 = self.enc3(p2)
+        p3 = self.pool(e3)
+
+        b = self.bottleneck(p3)
+
+        d3 = self.up3(b)
+        e3 = center_crop(e3, d3.shape[2:])
+        d3 = torch.cat((d3, e3), dim=1)
+        d3 = self.dec3(d3)
+
+        d2 = self.up2(d3)
+        e2 = center_crop(e2, d2.shape[2:])
+        d2 = torch.cat((d2, e2), dim=1)
+        d2 = self.dec2(d2)
+
+        d1 = self.up1(d2)
+        e1 = center_crop(e1, d1.shape[2:])
+        d1 = torch.cat((d1, e1), dim=1)
+        d1 = self.dec1(d1)
+
+        out = self.final(d1)
+        return self.output_act(out)  # Output in [0, 1] range
+
+# === Utility for Normalization (if needed elsewhere) ===
 def get_normalize():
-    return transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # for [-1, 1]
+    return transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 
-# Denormalization for output
 def denormalize(tensor):
-    return (tensor + 1) / 2  # maps [-1, 1] back to [0, 1]
+    return torch.clamp(tensor, 0, 1)
