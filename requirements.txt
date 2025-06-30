@@ -1,16 +1,16 @@
-# Core ML
 torch
 torchvision
 
-# Data handling and image ops
 numpy
 opencv-python
 Pillow
 scikit-image
+scipy
 
-# Visualization and tracking
 matplotlib
 tqdm
 
-# Optional but helpful
-scipy  # useful for metrics or pre-processing
+kornia
+pytorch-msssim
+
+gdown
