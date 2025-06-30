@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torchvision.utils import save_image
 import torch.nn.functional as F
-from pytorch_msssim import ssim
 
 from models.student_model import StudentNet
 
@@ -29,60 +28,51 @@ def load_student_model(weight_path, device):
     model.eval()
     return model
 
-# === Test Inference with SSIM and FPS ===
+# === Test Inference with FPS and Visualization ===
 def test_student_model(blur_path, weight_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"🖥️ Using device: {device}")
 
     model = load_student_model(weight_path, device)
 
-    # Load blurred image
+    # Load blurred input image
     blurred_img = Image.open(blur_path).convert("RGB")
     padded_tensor, (orig_h, orig_w), (pt, pb, pl, pr) = pad_image_reflect(blurred_img)
     padded_tensor = padded_tensor.to(device)
 
-    # Warm-up (optional for GPU)
+    # Warm-up
     for _ in range(3):
         _ = model(padded_tensor)
-
     torch.cuda.synchronize() if device.type == 'cuda' else None
 
-    # === Timed Inference ===
+    # === Timed Inference (batch of 10 for FPS) ===
+    batch = padded_tensor.repeat(10, 1, 1, 1)
     start_time = time.time()
     with torch.no_grad():
-        output = model(padded_tensor)
+        output = model(batch)
         torch.cuda.synchronize() if device.type == 'cuda' else None
     elapsed_time = time.time() - start_time
-    fps = 1.0 / elapsed_time
+    fps = 10.0 / elapsed_time
 
-    # Clamp output to [0, 1] in case of numerical drift
+    # Clamp and crop output
     output = torch.clamp(output, 0, 1)
-
-    # === Remove padding to recover original size ===
     output_cropped = output[:, :, pt:pt + orig_h, pl:pl + orig_w]
 
-    # Save restored output
-    save_image(output_cropped, "student_output_restored.png")
+    # Save first restored output
+    save_image(output_cropped[0], "student_output_restored.png")
     print("💾 Saved output as 'student_output_restored.png'")
+    print(f"🚀 FPS (batch): {fps:.2f}")
+    print(f"📊 Output range: [{output_cropped.min():.3f}, {output_cropped.max():.3f}]\n")
 
-    # === SSIM ===
-    original_tensor = transforms.ToTensor()(blurred_img).unsqueeze(0).to(device)
-    ssim_score = ssim(output_cropped, original_tensor, data_range=1.0, size_average=True).item()
-
-    print(f"🚀 FPS: {fps:.2f}")
-    print(f"📈 SSIM vs Input (blurred): {ssim_score:.4f}")
-    print(f"📊 Output range: [{output_cropped.min():.3f}, {output_cropped.max():.3f}]")
-
-    # === Display Side-by-Side ===
+    # === Display Side-by-Side: Input vs Student ===
+    input_tensor = transforms.ToTensor()(blurred_img)
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-    axs[0].imshow(original_tensor.squeeze().permute(1, 2, 0).cpu().numpy())
+    axs[0].imshow(input_tensor.permute(1, 2, 0).cpu().numpy())
     axs[0].set_title("Input (Blurred)")
     axs[0].axis("off")
-
-    axs[1].imshow(output_cropped.squeeze().permute(1, 2, 0).cpu().numpy())
-    axs[1].set_title("Output (Restored)")
+    axs[1].imshow(output_cropped[0].permute(1, 2, 0).cpu().numpy())
+    axs[1].set_title("Student Output")
     axs[1].axis("off")
-
     plt.tight_layout()
     plt.show()
 
