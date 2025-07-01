@@ -63,10 +63,7 @@ Restormer/Motion_Deblurring/pretrained_models/
   ```
 
 - **Simulate Blur:**  
-  ```bash
-  python blur.py
-  ```
-  or
+
   ```bash
   python generate_test_input_blur.py
   ```
