@@ -9,7 +9,7 @@
 - **test/input/**: Contains blurred images for testing and evaluation.
 - **test/target/**: Contains the corresponding sharp ground truth images for the test set.
 
-- **test.zip**: A compressed archive of the test set for easy sharing or submission.
+- **train.zip**: A compressed archive of the test set for easy sharing or submission.
 
 ## Notes
 
