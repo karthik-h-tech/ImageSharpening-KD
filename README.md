@@ -156,8 +156,6 @@ Use the `MOS_evaluation/` folder to:
 | `test_restormer_teacher.py`  | Runs teacher model and saves input, target, output images  |
 | `download_data.py`           | Downloads datasets (e.g., DIV2K, Unsplash)                 |
 | `extract_data.py`            | Unzips and organizes datasets                              |
-| `optimize_fps.py`            | (Optional) Prunes or quantizes model for faster inference  |
-| `rename.py`                  | Renames files in bulk (utility)                            |
 | `MOS_evaluation/`            | Subjective visual rating templates                         |
 | `teacher_output/`            | Contains input, target, and restored teacher outputs       |
 
