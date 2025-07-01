@@ -1,6 +1,10 @@
-# 🧠 Student-Teacher Framework for Real-Time Video Restoration
+# 🧠 Real-Time Video Frame Restoration via Student-Teacher Knowledge Distillation
 
-This project implements a lightweight **student model** trained using a high-performing **Restormer teacher model** through knowledge distillation. The system is designed to restore degraded video frames caused by low-bandwidth conditions such as motion blur, compression, and resolution loss—common in online classrooms or low-quality calls.
+This project presents a framework for restoring degraded video frames in real-time using a compact **student model** trained via **knowledge distillation** from a high-capacity **Restormer teacher model**.
+
+The aim is to enable real-time enhancement of video quality in scenarios such as online classes, teleconferencing, and surveillance—where video frames may be degraded due to motion blur or poor capture hardware.
+
+Our approach balances **speed and restoration quality**, ensuring the student model can run on low-resource devices while benefiting from the powerful supervision of the Restormer model.
 
 The student model is real-time and optimized for deployment on low-end devices, while the teacher model ensures high restoration fidelity.
 
