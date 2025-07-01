@@ -5,7 +5,14 @@ This project implements a lightweight **student model** trained using a high-per
 The student model is real-time and optimized for deployment on low-end devices, while the teacher model ensures high restoration fidelity.
 
 ---
+## 📦 Prerequisites
 
+### ✅ Clone Restormer Repository
+
+To train or test using the teacher model, you **must clone the official Restormer repo**:
+
+```bash
+git clone https://github.com/swz30/Restormer.git
 ## 📦 Restormer Checkpoint (Required)
 
 To train or evaluate using the teacher model (`Restormer`), you must download the pretrained weights:
