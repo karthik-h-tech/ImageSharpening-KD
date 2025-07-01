@@ -33,9 +33,9 @@ def save_img(filepath, img):
 # ------------------------
 # CONFIG
 # ------------------------
-input_path = 'data/train/input/GOPR0372_07_00-000047.png'
-gt_path = 'data/train/target/GOPR0881_11_01-000047.png'  # ground truth image
-result_dir = 'results'
+input_path = 'teacher_output/input/teacher_input.png'
+gt_path = 'teacher_output/target/teacher_target.png'  # ground truth image
+result_dir = 'teacher_output/output/'
 weights_path = 'motion_deblurring.pth'
 os.makedirs(result_dir, exist_ok=True)
 
