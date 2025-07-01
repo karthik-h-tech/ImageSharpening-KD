@@ -12,7 +12,7 @@ To train or evaluate using the teacher model (`Restormer`), you must download th
 
 🔗 [Download Restormer Deblurring `.pth` file](https://drive.google.com/file/d/1TDzcqvoNJS54yk7RSC-pco__HB4E32pz/view?usp=drive_link)
 
-Place the file here:
+Place the file here:Restormer/Motion_Deblurring/pretrained_models/
 
 
 ---
