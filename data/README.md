@@ -1,39 +1,29 @@
-# Dataset Preparation Instructions
 
-This folder should contain the training, validation, and test datasets organized as follows:
+## Description
 
-- data/
-  - train/
-    - class1/
-    - class2/
-    - ...
-  - val/
-    - class1/
-    - class2/
-    - ...
-  - test/
-    - class1/
-    - class2/
-    - ...
+- **train/input/**: Contains the original blurred images used for training.
+- **train/input_patches/**: Contains small patches cropped from the blurred training images. These are used to speed up and diversify training.
+- **train/target/**: Contains the corresponding sharp (ground truth) images for the training set.
+- **train/target_patches/**: Contains patches cropped from the sharp training images, aligned with `input_patches`.
 
-Each class folder should contain images belonging to that class.
+- **test/input/**: Contains blurred images for testing and evaluation.
+- **test/target/**: Contains the corresponding sharp ground truth images for the test set.
 
-## How to add your own images
-
-1. Create subfolders inside train, val, and test directories for each category/class of images.
-2. Add your images (preferably high-resolution) into the respective folders.
-3. The training script will automatically load images from these folders.
-
-## Sample Dataset
-
-If you want to test the pipeline quickly, you can download a sample dataset such as:
-
-- [BSD500 dataset](https://www2.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html)
-- [DIV2K dataset](https://data.vision.ee.ethz.ch/cvl/DIV2K/)
-
-Download and extract the images into the respective folders.
+- **test.zip**: A compressed archive of the test set for easy sharing or submission.
 
 ## Notes
 
-- Images will be downscaled and upscaled during training to simulate video conferencing conditions.
-- Ensure images are in formats supported by PIL (e.g., JPG, PNG).
+- All images are in standard formats (`.jpg`, `.png`).
+- Patches are typically used for efficient training and to increase dataset diversity.
+- Ensure that the number and order of images in `input` and `target` (and their patch folders) match for correct training and evaluation.
+
+## Usage
+
+- Use the `train/` folders for model training.
+- Use the `test/` folders for model evaluation and benchmarking.
+- If you need to regenerate patches, use the provided `generate_patches.py` script.
+
+---
+
+**Contact:**  
+For questions about the dataset or structure, please contact the project maintainer.
