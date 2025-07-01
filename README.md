@@ -1,3 +1,19 @@
+# 🧠 Student-Teacher Framework for Real-Time Video Restoration
+
+This project implements a lightweight **student model** trained using a high-performing **Restormer teacher model** through knowledge distillation. The system is designed to restore degraded video frames caused by low-bandwidth conditions such as motion blur, compression, and resolution loss—common in online classrooms or low-quality calls.
+
+The student model is real-time and optimized for deployment on low-end devices, while the teacher model ensures high restoration fidelity.
+
+---
+
+## 📦 Restormer Checkpoint (Required)
+
+To train or evaluate using the teacher model (`Restormer`), you must download the pretrained weights:
+
+🔗 [Download Restormer Deblurring `.pth` file](https://drive.google.com/file/d/1TDzcqvoNJS54yk7RSC-pco__HB4E32pz/view?usp=drive_link)
+
+Place the file here:
+
 
 ---
 
