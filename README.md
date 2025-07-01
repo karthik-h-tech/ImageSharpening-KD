@@ -146,7 +146,6 @@ Use the `MOS_evaluation/` folder to:
 | `download_data.py`           | Downloads datasets (e.g., DIV2K, Unsplash)                 |
 | `extract_data.py`            | Unzips and organizes datasets                              |
 | `optimize_fps.py`            | (Optional) Prunes or quantizes model for faster inference  |
-| `rename.py`                  | Renames files in bulk (utility)                            |
 | `MOS_evaluation/`            | Subjective visual rating templates                         |
 
 ---
