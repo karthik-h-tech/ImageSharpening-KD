@@ -5,6 +5,7 @@ This project implements a lightweight **student model** trained using a high-per
 The student model is real-time and optimized for deployment on low-end devices, while the teacher model ensures high restoration fidelity.
 
 ---
+
 ## 📦 Prerequisites
 
 ### ✅ Clone Restormer Repository
@@ -13,44 +14,55 @@ To train or test using the teacher model, you **must clone the official Restorme
 
 ```bash
 git clone https://github.com/swz30/Restormer.git
-## 📦 Restormer Checkpoint (Required)
+```
+
+Make sure the cloned folder structure looks like this:
+
+```
+your_project/
+├── Restormer/
+│   └── Motion_Deblurring/
+├── train.py
+├── test_student.py
+└── ...
+```
+
+---
+
+### 📥 Restormer Checkpoint (Required)
 
 To train or evaluate using the teacher model (`Restormer`), you must download the pretrained weights:
 
 🔗 [Download Restormer Deblurring `.pth` file](https://drive.google.com/file/d/1TDzcqvoNJS54yk7RSC-pco__HB4E32pz/view?usp=drive_link)
 
-Place the file here: Restormer/Motion_Deblurring/pretrained_models/
+Place the file here:
 
+```
+Restormer/Motion_Deblurring/pretrained_models/
+```
 
 ---
 
-## Working & Workflow
+## 🧪 Working & Workflow
 
 ### 1. **Data Preparation**
 
 - **Download Data:**  
-  Run:
   ```bash
   python download_data.py
   ```
-  This script downloads and organizes public datasets (e.g., DIV2K, Unsplash) into the `data/` folder.
 
 - **Extract Data:**  
-  If your data is in compressed or raw format, run:
   ```bash
   python extract_data.py
   ```
-  This will extract and organize the images into the correct subfolders.
 
 - **Generate Patches:**  
-  For efficient training, generate patches from the full images:
   ```bash
   python generate_patches.py
   ```
-  This creates `input_patches/` and `target_patches/` in `data/train/`.
 
 - **Simulate Blur:**  
-  To create blurred images for training/testing, use:
   ```bash
   python blur.py
   ```
@@ -59,83 +71,113 @@ Place the file here: Restormer/Motion_Deblurring/pretrained_models/
   python generate_test_input_blur.py
   ```
 
+---
+
 ### 2. **Restormer Teacher Model**
 
 - The `Restormer/` directory is sourced from the official [Restormer repository](https://github.com/swz30/Restormer) ([CVPR 2022](https://arxiv.org/abs/2111.09881)).
 - It contains the code and pretrained weights for the teacher model, which is state-of-the-art for image restoration tasks such as motion deblurring, deraining, and denoising.
 - For more details, see the [Restormer README](https://github.com/swz30/Restormer/blob/main/README.md).
 
+---
+
 ### 3. **Model Training**
 
-- **Train the Student Model:**  
-  ```bash
-  python train.py
-  ```
-  This script performs multi-stage training using knowledge distillation from the teacher (Restormer). It automatically handles checkpointing and resumes if interrupted.
+To train the student model using the Restormer teacher:
+
+```bash
+python train.py
+```
+
+- Performs multi-stage training with knowledge distillation.
+- Automatically resumes if interrupted.
+
+---
 
 ### 4. **Testing & Evaluation**
 
-- **Test the Student Model:**  
+- **Test the Student Model:**
   ```bash
   python test_student.py
   ```
 
-- **Test the Teacher Model:**  
+- **Test the Teacher Model:**
   ```bash
   python test_restormer_teacher.py
   ```
 
-- **Evaluate Performance:**  
+- **Evaluate Performance (PSNR, SSIM):**
   ```bash
   python evaluate.py
   ```
-  Computes SSIM, PSNR, and other metrics on the test set.
 
-- **Benchmark Speed:**  
+- **Benchmark Speed (FPS):**
   ```bash
   python benchmark_model_fps.py
   ```
 
+---
+
 ### 5. **Subjective Evaluation (MOS Study)**
 
-- Conduct a Mean Opinion Score (MOS) study using the outputs and the provided Excel or script templates in `MOS_evaluation/`.
+Use the `MOS_evaluation/` folder to conduct a Mean Opinion Score (MOS) study. Tools and templates for Excel-based or automated surveys are provided.
 
 ---
 
-## File Descriptions
+## 📁 File Descriptions
 
-- **train.py**: Main training loop for student-teacher distillation.
-- **models/student_model.py**: Lightweight student model for real-time inference.
-- **models/teacher_model.py**: High-capacity teacher model (Restormer).
-- **blur.py**: Simulates realistic video call blur.
-- **generate_patches.py**: Splits images into patches for efficient training.
-- **evaluate.py**: Computes objective metrics (SSIM, PSNR).
-- **benchmark_model_fps.py**: Measures model inference speed.
-- **test_student.py**: Runs the student model on sample images.
-- **test_restormer_teacher.py**: Runs the teacher model on sample images.
-- **optimize_fps.py**: (Optional) Script to further optimize model speed.
-- **rename.py**: Utility for renaming files in bulk.
-- **download_data.py**: Script to download public datasets.
-- **extract_data.py**: Organizes and extracts raw datasets.
+| File                          | Description                                              |
+|------------------------------|----------------------------------------------------------|
+| `train.py`                   | Trains student model using teacher supervision           |
+| `models/student_model.py`    | Lightweight model for deployment                         |
+| `models/teacher_model.py`    | Wrapper for Restormer model                              |
+| `blur.py`                    | Simulates blur for training                              |
+| `generate_patches.py`        | Prepares image patches for training                      |
+| `evaluate.py`                | Computes SSIM and PSNR                                   |
+| `benchmark_model_fps.py`     | Benchmarks inference time                                |
+| `test_student.py`            | Runs student model for inference                         |
+| `test_restormer_teacher.py`  | Runs teacher model (Restormer)                           |
+| `optimize_fps.py`            | Optional: optimize student model for speed               |
+| `rename.py`                  | Utility script to rename files                           |
+| `download_data.py`           | Downloads training/test data                             |
+| `extract_data.py`            | Unzips and organizes datasets                            |
 
 ---
 
-## Requirements
+## 📦 Requirements
 
 - Python 3.8+
-- PyTorch, torchvision, kornia, pytorch_msssim, tqdm, opencv-python, scikit-image, and other dependencies in `requirements.txt`.
-- For Restormer, see [Restormer/INSTALL.md](https://github.com/swz30/Restormer/blob/main/INSTALL.md) for any additional requirements.
+- Install dependencies:
+  ```bash
+  pip install -r requirements.txt
+  ```
+- For Restormer-specific dependencies, see:
+  [Restormer/INSTALL.md](https://github.com/swz30/Restormer/blob/main/INSTALL.md)
 
 ---
 
-## Results & Certification
+## ✅ Results & Certification
 
-- The student model achieves real-time performance and high SSIM on diverse test images.
-- For certification, both objective (SSIM > 0.90) and subjective (MOS) evaluations are provided.
-- See the `MOS_evaluation/` folder for subjective study templates and results.
+- The student model:
+  - Achieves real-time performance on low-end hardware
+  - Reaches SSIM > 0.90 on benchmark datasets
+- Includes:
+  - Objective results (PSNR, SSIM)
+  - Subjective evaluation (MOS)
+- See the `results/` and `MOS_evaluation/` folders for full metrics and visual comparisons.
 
 ---
 
-## Citation
+## 📚 Citation
 
-If you use the Restormer teacher model, please cite:
+If you use this framework or the Restormer teacher model, please cite:
+
+```bibtex
+@inproceedings{Restormer,
+  author    = {Syed Waqas Zamir and Aditya Arora and Salman Khan and Munawar Hayat and Fahad Shahbaz Khan and Ming-Hsuan Yang and Ling Shao},
+  title     = {Restormer: Efficient Transformer for High-Resolution Image Restoration},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2022},
+  pages     = {5728--5739}
+}
+```
