@@ -33,8 +33,8 @@ def save_img(filepath, img):
 # ------------------------
 # CONFIG
 # ------------------------
-input_path = 'data/test/input/GOPR0384_11_00-000001.png'
-gt_path = 'data/test/target/GOPR0384_11_00-000001.png'  # ground truth image
+input_path = 'data/train/input/GOPR0372_07_00-000047.png'
+gt_path = 'data/train/target/GOPR0881_11_01-000047.png'  # ground truth image
 result_dir = 'results'
 weights_path = 'Restormer/Motion_Deblurring/pretrained_models/motion_deblurring.pth'
 os.makedirs(result_dir, exist_ok=True)

@@ -14,3 +14,19 @@ kornia
 pytorch-msssim
 
 gdown
+
+pyyaml
+addict
+future
+lmdb
+yacs
+joblib
+natsort
+h5py
+einops
+tb-nightly
+yapf
+lpips
+requests
+scikit-learn
+dlib  # Optional, only if you use face restoration features
