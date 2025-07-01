@@ -89,7 +89,7 @@ def calculate_ssim(img1, img2):
     return ssim_func(img1, img2, channel_axis=2, win_size=win_size, data_range=1.0)
 
 # ------------------------------
-# Load Model
+# Load Student Model
 # ------------------------------
 def load_student_model(device, path="student_model_trained.pth"):
     model = StudentNet().to(device)
@@ -107,6 +107,7 @@ def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("🖥️ Using device:", device)
 
+    # Set to test dataset directories
     lr_dir = "data/test/input"
     hr_dir = "data/test/target"
 
@@ -134,7 +135,7 @@ def evaluate():
             p_loss = perceptual_loss_fn(out, hr).item()
             perceptual_losses.append(p_loss)
 
-            # SSIM
+            # SSIM calculation
             out_np = denormalize(out).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
             hr_np = denormalize(hr).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
 

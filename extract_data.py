@@ -35,40 +35,22 @@ if os.path.exists(train_zip):
     os.makedirs(os.path.join(train_final_dir, "target"), exist_ok=True)
 
     # Move input and target folders
-    if os.path.exists(os.path.join(train_extract_tmp, "input")):
-        move_contents(os.path.join(train_extract_tmp, "input"), os.path.join(train_final_dir, "input"))
-    if os.path.exists(os.path.join(train_extract_tmp, "target")):
-        move_contents(os.path.join(train_extract_tmp, "target"), os.path.join(train_final_dir, "target"))
+    input_dir = os.path.join(train_extract_tmp, "input")
+    target_dir = os.path.join(train_extract_tmp, "target")
+
+    if os.path.exists(input_dir):
+        move_contents(input_dir, os.path.join(train_final_dir, "input"))
+    else:
+        print("⚠️ No 'input' folder found in extracted zip.")
+
+    if os.path.exists(target_dir):
+        move_contents(target_dir, os.path.join(train_final_dir, "target"))
+    else:
+        print("⚠️ No 'target' folder found in extracted zip.")
 
     shutil.rmtree(train_extract_tmp)
     print("📁 Train data organized in data/train/")
 else:
     print("⚠️ train.zip not found!")
 
-# -------------------------------
-# Extract & prepare test data
-# -------------------------------
-test_zip = 'data/test.zip'
-test_extract_tmp = 'data/test_tmp'
-test_final_dir = 'data/test'
-
-if os.path.exists(test_zip):
-    extract_zip(test_zip, test_extract_tmp)
-
-    # Create final dirs
-    os.makedirs(test_final_dir, exist_ok=True)
-    os.makedirs(os.path.join(test_final_dir, "input"), exist_ok=True)
-    os.makedirs(os.path.join(test_final_dir, "target"), exist_ok=True)
-
-    # Move input and target folders
-    if os.path.exists(os.path.join(test_extract_tmp, "input")):
-        move_contents(os.path.join(test_extract_tmp, "input"), os.path.join(test_final_dir, "input"))
-    if os.path.exists(os.path.join(test_extract_tmp, "target")):
-        move_contents(os.path.join(test_extract_tmp, "target"), os.path.join(test_final_dir, "target"))
-
-    shutil.rmtree(test_extract_tmp)
-    print("📁 Test data organized in data/test/")
-else:
-    print("⚠️ test.zip not found!")
-
-print("🚀 All done!")
+print("🚀 Done preparing train data.")
