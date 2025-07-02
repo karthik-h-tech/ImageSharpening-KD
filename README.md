@@ -117,7 +117,8 @@ python train.py
   https://drive.google.com/file/d/1VPZTQGoDkdzldFk7PH1KH_vfIg1KwRq8/view?usp=drive_link  
   Place it in the project root directory and run:  
   ```bash
- python extract_test.py
+  python extract_testpy
+  ```
  
 - **Test the student model**:
   ```bash
