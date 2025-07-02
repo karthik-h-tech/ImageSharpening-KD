@@ -71,6 +71,6 @@ def test_student_model(blur_path, weight_path):
 
 if __name__ == "__main__":
     test_student_model(
-        "blurred_video_call_sim.jpg",
+        "blurred_low_bandwidth_sim.jpg",
         "student_model_trained.pth"
     )

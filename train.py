@@ -179,7 +179,12 @@ def train():
                         vgg = vgg_loss_fn(student_out, hr_img)
                         ssim_loss = 1 - ssim(student_out.float(), hr_img.float(), data_range=1.0, size_average=True)
                         edge = edge_loss(student_out, hr_img)
-                        loss = 0.4 * recon + 0.4 * feat + 0.2 * vgg + 0.2 * ssim_loss + 0.1 * edge
+                        lab = lab_loss(student_out, hr_img)
+                        if epoch > 8:
+                            lab_weight = 0.05  # Slightly higher after 8th epoch
+                        else:
+                            lab_weight = 0.01  # Original/small value
+                        loss = 0.4 * recon + 0.4 * feat + 0.2 * vgg + 0.2 * ssim_loss + 0.1 * edge + lab_weight * lab
 
                     if torch.isnan(loss) or torch.isinf(loss):
                         print(f"⚠️ Skipping batch {i} due to invalid loss: {loss.item()}")
@@ -225,25 +230,24 @@ def train():
             if avg_ssim > best_ssim:
                 best_ssim = avg_ssim
                 print(f"🎯 New best SSIM: {best_ssim:.4f}")
-
-            try:
-                torch.save({
-                    "model": student.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                    "scaler": scaler.state_dict(),
-                    "stage": stage_idx,
-                    "epoch": epoch,
-                    "best_ssim": best_ssim,
-                }, "student_model_trained.pth")
-                print("💾 Checkpoint saved successfully.")
-            except Exception as e:
-                print(f"⚠️ Error saving checkpoint: {e}")
+                try:
+                    torch.save({
+                        "model": student.state_dict(),
+                        "optimizer": optimizer.state_dict(),
+                        "scheduler": scheduler.state_dict(),
+                        "scaler": scaler.state_dict(),
+                        "stage": stage_idx,
+                        "epoch": epoch,
+                        "best_ssim": best_ssim,
+                    }, "student_model_trained.pth")
+                    print("💾 Checkpoint saved successfully.")
+                except Exception as e:
+                    print(f"⚠️ Error saving checkpoint: {e}")
 
             if avg_loss < best_loss:
                 best_loss = avg_loss
                 no_improve = 0
-                print("💾 Model improved and saved.")
+                # print("💾 Model improved and saved.")
             else:
                 no_improve += 1
                 print(f"📉 No improvement ({no_improve}/{patience})")
@@ -262,7 +266,7 @@ def train():
     run_training(stage_size=(288, 288), stage_epochs=5, stage_batch=1, stage_idx=2)
 
     print(f"🎉 Training complete. Best model saved as student_model_trained.pth")
-    print(f"🏆 Final best SSIM: {best_ssim:.4f}")
+    print(f" Final best SSIM: {best_ssim:.4f}")
 
 if __name__ == "__main__":
     train()
