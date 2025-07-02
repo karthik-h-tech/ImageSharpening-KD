@@ -191,6 +191,24 @@ Use the `MOS_evaluation/` folder to:
 
 ---
 
+
+## 🧩 Deployment Note for Real-World Scenarios
+
+This framework is optimized for **real-time restoration of lightly degraded video frames**, especially under conditions typical of:
+
+- 🎥 **Video conferencing**
+- 👩‍🏫 **Online classrooms**
+- 🏥 **Telemedicine**
+- 🎦 **Lightweight surveillance**
+- 📱 **Mobile and edge streaming**
+
+In these scenarios, degradations are generally **minor**, including:
+
+- Slight motion blur from camera shake
+- Light Gaussian noise from compression or bandwidth constraints
+- Mild JPEG artifacts
+
+
 ## 📚 Citation
 
 If you use this framework or the Restormer teacher model, please cite:
