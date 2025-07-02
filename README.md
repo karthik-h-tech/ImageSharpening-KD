@@ -1,3 +1,5 @@
+# 🧠 Real-Time Video Frame Restoration via Student-Teacher Knowledge Distillation
+
 ## 📝 Abstract
 
 This project proposes a lightweight real-time video frame restoration framework based on **knowledge distillation**. A compact **student model**, capable of running at **30+ FPS** on low-end hardware (e.g., Jetson Nano, Raspberry Pi 4, or mid-range CPUs), is trained using supervision from a high-capacity **Restormer teacher model**.
