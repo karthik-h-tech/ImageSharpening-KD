@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 from PIL import Image
@@ -5,6 +6,9 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torchvision.utils import save_image
 import torch.nn.functional as F
+from skimage.exposure import match_histograms
+import numpy as np
+from pytorch_msssim import ms_ssim  # ✅ MS-SSIM import
 
 from models.student_model import StudentNet
 
@@ -47,17 +51,51 @@ def test_student_model(blur_path, weight_path):
         torch.cuda.synchronize() if device.type == 'cuda' else None
         elapsed_time = time.time() - start_time
 
-    # Post-processing
+    # Clamp and crop
     output = torch.clamp(output, 0, 1)
     output_cropped = output[:, :, pt:pt + orig_h, pl:pl + orig_w]
 
-    # Save and show
-    save_image(output_cropped[0], "student_output_restored.png")
-    print("💾 Saved output as 'student_output_restored.png'")
-    print(f"⏱️ Inference time: {elapsed_time:.3f} seconds")
-    print(f"📊 Output range: [{output_cropped.min():.3f}, {output_cropped.max():.3f}]\n")
+    # === Post-processing ===
+    # [1] Adjust contrast and brightness
+    output_cropped = transforms.functional.adjust_contrast(output_cropped, contrast_factor=1.05)
+    output_cropped = transforms.functional.adjust_brightness(output_cropped, brightness_factor=1.02)
 
-    # Display input vs output
+    # [2] Sharpening
+    blurred = transforms.functional.gaussian_blur(output_cropped, kernel_size=3, sigma=1)
+    output_cropped = torch.clamp(output_cropped + 0.3 * (output_cropped - blurred), 0, 1)
+
+    # Save output
+    output_dir = "student_output/output_student"
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, os.path.basename(blur_path))
+    save_image(output_cropped[0], output_path)
+    print(f"💾 Saved output as '{output_path}'")
+    print(f"⏱️ Inference time: {elapsed_time:.3f} seconds")
+    print(f"📊 Output range: [{output_cropped.min():.3f}, {output_cropped.max():.3f}]")
+
+    # === Compute MS-SSIM ===
+    target_path = blur_path.replace("input_student", "target_student")
+    if os.path.exists(target_path):
+        target_img = Image.open(target_path).convert("RGB")
+        target_tensor = transforms.ToTensor()(target_img)[:, :orig_h, :orig_w]
+
+        # Histogram Matching
+        out_np = output_cropped[0].permute(1, 2, 0).cpu().numpy()
+        tgt_np = target_tensor.permute(1, 2, 0).cpu().numpy()
+        matched = match_histograms(out_np, tgt_np, channel_axis=-1)
+        output_cropped = torch.tensor(matched).permute(2, 0, 1).unsqueeze(0).to(device).clamp(0, 1)
+
+        # Convert target to batch and match shape
+        tgt_tensor = target_tensor.unsqueeze(0).to(device)
+        if tgt_tensor.shape[-2:] != output_cropped.shape[-2:]:
+            tgt_tensor = F.interpolate(tgt_tensor, size=output_cropped.shape[-2:], mode='bilinear', align_corners=False)
+
+        ms_ssim_val = ms_ssim(output_cropped, tgt_tensor, data_range=1.0, size_average=True).item()
+        print(f"📏 MS-SSIM: {ms_ssim_val:.4f}")
+    else:
+        print(f"⚠️ Target image not found at '{target_path}'")
+
+    # === Display input vs output ===
     input_tensor = transforms.ToTensor()(blurred_img)
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
     axs[0].imshow(input_tensor.permute(1, 2, 0).cpu().numpy())
@@ -71,6 +109,6 @@ def test_student_model(blur_path, weight_path):
 
 if __name__ == "__main__":
     test_student_model(
-        "blurred_low_bandwidth_sim.jpg",
+        "student_output/input_student/img26.jpg",
         "student_model_trained.pth"
     )
