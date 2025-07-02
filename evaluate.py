@@ -6,8 +6,8 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, models
 import torch.nn.functional as F
-import cv2
-from skimage.metrics import structural_similarity as ssim_func
+from pytorch_msssim import ms_ssim
+from torchvision.utils import make_grid
 from models.student_model import StudentNet
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -28,12 +28,12 @@ class PairedImageDataset(Dataset):
             for root, _, files in os.walk(hr_dir)
             for f in files if f.lower().endswith(('png', 'jpg', 'jpeg'))
         ])
-
-        lr_dict = {os.path.basename(p): p for p in lr_files}
-        hr_dict = {os.path.basename(p): p for p in hr_files}
-        common = sorted(set(lr_dict.keys()) & set(hr_dict.keys()))
-        self.lr_images = [lr_dict[f] for f in common]
-        self.hr_images = [hr_dict[f] for f in common]
+        common_files = sorted(set(os.path.basename(f) for f in lr_files) & set(os.path.basename(f) for f in hr_files))
+        lr_map = {os.path.basename(f): f for f in lr_files}
+        hr_map = {os.path.basename(f): f for f in hr_files}
+        self.lr_images = [lr_map[f] for f in common_files]
+        self.hr_images = [hr_map[f] for f in common_files]
+        self.filenames = common_files
 
     def __len__(self):
         return len(self.lr_images)
@@ -41,16 +41,22 @@ class PairedImageDataset(Dataset):
     def __getitem__(self, idx):
         lr = Image.open(self.lr_images[idx]).convert('RGB')
         hr = Image.open(self.hr_images[idx]).convert('RGB')
+        filename = self.filenames[idx]
         if self.transform:
             lr = self.transform(lr)
             hr = self.transform(hr)
-        return lr, hr
+        return lr, hr, filename
 
 # ------------------------------
-# Denormalization [-1,1] -> [0,1]
+# Utility
 # ------------------------------
 def denormalize(tensor):
     return tensor * 0.5 + 0.5
+
+def save_image(tensor, path):
+    grid = make_grid(tensor, nrow=1, padding=0)
+    ndarr = (grid.mul(255).clamp(0, 255).byte().cpu().permute(1, 2, 0).numpy())
+    Image.fromarray(ndarr).save(path)
 
 # ------------------------------
 # Perceptual Loss
@@ -71,32 +77,13 @@ class PerceptualLoss(torch.nn.Module):
         return F.l1_loss(self.vgg(x), self.vgg(y))
 
 # ------------------------------
-# SSIM Utils
-# ------------------------------
-def ensure_min_size(img_np, min_size=7):
-    h, w = img_np.shape[:2]
-    if h < min_size or w < min_size:
-        img_np = cv2.resize(img_np, (max(w, min_size), max(h, min_size)), interpolation=cv2.INTER_LINEAR)
-    return img_np
-
-def calculate_ssim(img1, img2):
-    img1 = ensure_min_size(img1)
-    img2 = ensure_min_size(img2)
-    min_dim = min(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
-    win_size = min(7, min_dim)
-    if win_size % 2 == 0:
-        win_size -= 1
-    return ssim_func(img1, img2, channel_axis=2, win_size=win_size, data_range=1.0)
-
-# ------------------------------
 # Load Student Model
 # ------------------------------
 def load_student_model(device, path="student_model_trained.pth"):
     model = StudentNet().to(device)
     ckpt = torch.load(path, map_location=device)
     state_dict = ckpt.get("model") or ckpt.get("state_dict") or ckpt
-    clean_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    model.load_state_dict(clean_dict)
+    model.load_state_dict({k.replace("module.", ""): v for k, v in state_dict.items()})
     model.eval()
     return model
 
@@ -107,46 +94,45 @@ def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("🖥️ Using device:", device)
 
-    # Set to test dataset directories
     lr_dir = "data/test/input"
     hr_dir = "data/test/target"
 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])  # same as training
+        transforms.Normalize([0.5]*3, [0.5]*3),
     ])
 
     dataset = PairedImageDataset(lr_dir, hr_dir, transform)
     loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-    student = load_student_model(device)
-    perceptual_loss_fn = PerceptualLoss(device)
+    model = load_student_model(device)
+    perceptual = PerceptualLoss(device)
 
-    ssim_scores = []
-    perceptual_losses = []
+    ms_ssim_scores = []
+    p_losses = []
 
     with torch.no_grad():
-        for lr, hr in tqdm(loader, desc="📊 Evaluating"):
+        for lr, hr, _ in tqdm(loader, desc="📊 Evaluating"):
             lr, hr = lr.to(device), hr.to(device)
-            out = torch.clamp(student(lr), -1, 1)
+            pred = torch.clamp(model(lr), -1, 1)
 
             # Perceptual loss
-            p_loss = perceptual_loss_fn(out, hr).item()
-            perceptual_losses.append(p_loss)
+            p_loss = perceptual(pred, hr).item()
+            p_losses.append(p_loss)
 
-            # SSIM calculation
-            out_np = denormalize(out).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
-            hr_np = denormalize(hr).squeeze().clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
+            # MS-SSIM
+            pred_denorm = denormalize(pred).clamp(0, 1)
+            hr_denorm = denormalize(hr).clamp(0, 1)
+            ms_ssim_val = ms_ssim(pred_denorm, hr_denorm, data_range=1.0, size_average=True).item()
+            ms_ssim_scores.append(ms_ssim_val)
 
-            if out_np.shape != hr_np.shape:
-                out_np = cv2.resize(out_np, (hr_np.shape[1], hr_np.shape[0]), interpolation=cv2.INTER_LINEAR)
-
-            ssim_scores.append(calculate_ssim(out_np, hr_np))
+    avg_ssim = np.mean(ms_ssim_scores)
+    avg_ploss = np.mean(p_losses)
 
     print("\n✅ Evaluation Complete")
-    print("📈 Avg SSIM: {:.4f}".format(np.mean(ssim_scores)))
-    print("📉 Avg Perceptual Loss: {:.4f}".format(np.mean(perceptual_losses)))
+    print("📏 Avg MS-SSIM: {:.4f}".format(avg_ssim))
+    print("📉 Avg Perceptual Loss: {:.4f}".format(avg_ploss))
 
 if __name__ == "__main__":
     evaluate()

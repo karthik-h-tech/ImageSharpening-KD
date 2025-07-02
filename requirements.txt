@@ -27,6 +27,7 @@ einops
 tb-nightly
 yapf
 lpips
+torchmetrics
 requests
 scikit-learn
 dlib  # Optional, only if you use face restoration features

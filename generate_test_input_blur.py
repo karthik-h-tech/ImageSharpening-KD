@@ -1,50 +1,43 @@
 import cv2
-import os
-import mediapipe as mp
 import numpy as np
+import os
+import random
 
-# Define paths
-target_path = 'data/test/target'
-output_path = 'data/test/input'
+def degrade_image(img):
+    # Apply motion blur
+    if random.random() < 0.7:
+        k = random.choice([5, 7, 9, 11])
+        angle = random.uniform(0, np.pi)
+        kernel = np.zeros((k, k))
+        x0, y0 = k // 2, k // 2
+        x1 = int(x0 + (k // 2) * np.cos(angle))
+        y1 = int(y0 + (k // 2) * np.sin(angle))
+        cv2.line(kernel, (x0, y0), (x1, y1), 1, 1)
+        kernel /= np.sum(kernel)
+        img = cv2.filter2D(img, -1, kernel)
 
-# Create output folder if it doesn't exist
-os.makedirs(output_path, exist_ok=True)
+    # Add Gaussian noise
+    if random.random() < 0.5:
+        noise = np.random.normal(0, 3, img.shape).astype(np.int16)
+        img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
-# Sort the image filenames to maintain order
-image_filenames = sorted([
-    f for f in os.listdir(target_path)
-    if f.lower().endswith(('.png', '.jpg', '.jpeg'))
-])
+    return img
 
-# Setup MediaPipe Selfie Segmentation
-mp_selfie_segmentation = mp.solutions.selfie_segmentation
-segmentation = mp_selfie_segmentation.SelfieSegmentation(model_selection=1)
+# === Example usage ===
+input_dir = 'data/test/target'
+output_dir = 'data/test/input'
+os.makedirs(output_dir, exist_ok=True)
 
-# Process each image
-for filename in image_filenames:
-    img_path = os.path.join(target_path, filename)
+for fname in sorted(os.listdir(input_dir)):
+    if not fname.lower().endswith(('.jpg', '.png', '.jpeg')):
+        continue
+    img_path = os.path.join(input_dir, fname)
     img = cv2.imread(img_path)
-
     if img is None:
-        print(f"Failed to read {filename}")
         continue
 
-    # Convert to RGB for MediaPipe
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = segmentation.process(img_rgb)
+    degraded = degrade_image(img)
+    out_path = os.path.join(output_dir, fname)
+    cv2.imwrite(out_path, degraded)
 
-    # Generate mask from segmentation
-    mask = results.segmentation_mask
-    condition = mask > 0.5  # Person is foreground
-
-    # Create blurred background
-    blurred = cv2.GaussianBlur(img, (55, 55), 0)
-
-    # Composite image: person in focus, background blurred
-    output_img = np.where(condition[..., None], img, blurred)
-
-    # Save image to output folder
-    output_file = os.path.join(output_path, filename)
-    cv2.imwrite(output_file, output_img)
-
-print("Processing complete. Blurred images saved to:", output_path)
+print("✅ Degraded images saved to:", output_dir)
