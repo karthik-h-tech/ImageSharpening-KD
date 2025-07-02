@@ -112,6 +112,12 @@ python train.py
 
 ### 4. ✅ Testing & Evaluation
 
+- **Download and extract test set**:  
+  Manually download the ZIP from:  
+  https://drive.google.com/file/d/1VPZTQGoDkdzldFk7PH1KH_vfIg1KwRq8/view?usp=drive_link  
+  Place it in the project root directory and run:  
+  ```bash
+
 - **Test the student model**:
   ```bash
   python test_student.py
