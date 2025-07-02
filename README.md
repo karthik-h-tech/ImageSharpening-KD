@@ -84,6 +84,15 @@ Restormer/Motion_Deblurring/pretrained_models/
 - It is pretrained and provides high-quality restoration performance.
 - Used only for training the student model or as a comparison baseline.
 
+#### 🗂️ Student Output Folder Structure
+
+```bash
+student_output/
+├── input/     # Blurred input frames
+├── target/    # Ground truth (clean) frames
+└── output/    # Restored frames from StudentNet
+```
+
 #### 🗂️ Teacher Output Folder Structure
 
 When testing the teacher model (`test_restormer_teacher.py`), output is stored in:
