@@ -175,15 +175,6 @@ python test_student_video.py
 python degrade_video.py
  ```
 
-- **Download Example Videos (Target, Input, Output)**:
-- **Place them under**:
-- **student_output/input_student/
-- **student_output/target_student/
-- **student_output/output_student/
-- **Download link:
-- **https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link
-
-
 ### 5. 👁️ Subjective Evaluation (MOS)
 
 Use the `MOS_evaluation/` folder to:
@@ -242,6 +233,17 @@ Use the `MOS_evaluation/` folder to:
 - **Runs on edge devices** such as Raspberry Pi 4, Jetson Nano, or mid-range laptops.
 - **Teacher output** is organized into `teacher_output/input/`, `target/`, and `output/` for visual and quantitative comparisons.
 
+## 🎥 Video Testing Results
+
+| Metric     | Full HD Video (1920×1080) |
+|------------|---------------------------|
+| SSIM       | 0.95                       |
+| MS-SSIM    | 0.97                       |
+| FPS        | 30+ (Real-time)            |
+
+- **Tested on video sequences** using `python test_student_video.py`.
+- Achieves high structural similarity on realistic conferencing degradation.
+
 ## 📈 Why MS-SSIM?
 
 We use **Multi-Scale Structural Similarity Index (MS-SSIM)** as our primary evaluation metric.
@@ -255,12 +257,12 @@ This makes it more aligned with human visual perception, especially for assessin
 
 ## 📝 Performance Highlights
 
-| Metric     | Single Image | 100-Image Average |
-|------------|--------------|-------------------|
-| MS-SSIM    | 0.95         | 0.90              |
-| FPS        | 30+          | Real-time         |
+| Metric     | Single Image | 100-Image Average | Full HD Video |
+|------------|--------------|-------------------|---------------|
+| MS-SSIM    | 0.95         | 0.90              | 0.97          |
+| SSIM       | 0.93         | 0.89              | 0.95          |
+| FPS        | 30+          | Real-time         | Real-time     |
 
----
 
 ## 🧩 Deployment Note for Real-World Scenarios
 
