@@ -280,7 +280,8 @@ In these scenarios, degradations are generally **minor**, including:
 - Light Gaussian noise from compression or bandwidth constraints
 - Mild JPEG artifacts
 
-##🚀 Future Scope
+
+## 🚀 Future Scope
 - Integrate temporal consistency to stabilize multi-frame sequences and reduce flicker.
 - Apply quantization and pruning for ultra-constrained microcontroller deployment.
 - Extend to handle severe motion blur and low-light scenarios.
