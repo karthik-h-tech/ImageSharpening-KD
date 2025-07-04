@@ -151,7 +151,12 @@ python train.py
 
 ---
 
-### 📹 Video Testing & Degradation
+## 4. ✅ Video Testing & Degradation
+
+- **Download the example videos:**  
+  Manually download from:  
+  [https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link](https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link)  
+  Place them under:
 
 - ** Test the Model on Video**
  ```bash
