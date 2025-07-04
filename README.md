@@ -151,29 +151,27 @@ python train.py
 
 ---
 
-## 📹 Video Testing & Degradation
+### 📹 Video Testing & Degradation
 
-# 🔧 1. Test the Model on Video
-# To evaluate the student model on a degraded video using SSIM:
-
+- ** Test the Model on Video**
+ ```bash
 python test_student_video.py
+ ```
+# Output: student_output/output_student/output_student_video_side_by_side.mp4
 
-# Output will be saved to:
-# student_output/output_student/output_student_video_side_by_side.mp4
-
-
-# 🌫️ 2. Simulate Realistic Conferencing Blur
-# To degrade a high-quality video to simulate video conferencing artifacts:
-
+- **Simulate Realistic Conferencing Blur**
+ ```bash
 python degrade_video.py
+ ```
 
-
-# 📥 3. Download Example Videos
-# Download example target, input, and output videos:
-
+# 📥 3. Download Example Videos (Target, Input, Output):
+# Place them under:
+# student_output/input_student/
+# student_output/target_student/
+# student_output/output_student/
+# Download link:
 # https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link
 
----
 
 ### 5. 👁️ Subjective Evaluation (MOS)
 
