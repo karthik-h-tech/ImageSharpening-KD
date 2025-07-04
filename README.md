@@ -229,7 +229,6 @@ This makes it more aligned with human visual perception, especially for assessin
 
 ---
 
-
 ## 🧩 Deployment Note for Real-World Scenarios
 
 This framework is optimized for **real-time restoration of lightly degraded video frames**, especially under conditions typical of:
