@@ -151,19 +151,25 @@ python train.py
 
 ---
 
-## 4. ✅ Video Testing & Degradation
+## 5. ✅ Video Testing & Degradation
 
 - **Download the example videos:**  
   Manually download from:  
   [https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link](https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link)  
   Place them under:
-
+```bash
+  student_output/input_student/
+  student_output/target_student/
+  student_output/output_student/
+ ```
 - ** Test the Model on Video**
  ```bash
 python test_student_video.py
  ```
-- **Output: student_output/output_student/output_student_video_side_by_side.mp4**
-
+- **Output:
+ ```bash
+ student_output/output_student/output_student_video_side_by_side.mp4**     
+```
 - **Simulate Realistic Conferencing Blur**
  ```bash
 python degrade_video.py
