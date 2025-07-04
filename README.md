@@ -199,14 +199,33 @@ Use the `MOS_evaluation/` folder to:
 
 | Metric        | Student Model       | Teacher Model (Restormer) |
 |---------------|---------------------|----------------------------|
-| SSIM          | ≥ 0.90              | 0.94–0.96                  |
+| MS-SSIM          | ≥ 0.90           | 0.94–0.96                  |
 | PSNR          | 28–32 dB            | 32–35 dB                   |
 | Inference FPS | **30–60+ (Real-Time)** | 3–6 FPS (Non-real-time)     |
+
 
 - **Visual quality** is nearly indistinguishable from the teacher.
 - **MOS results** show strong human preference over raw input.
 - **Runs on edge devices** such as Raspberry Pi 4, Jetson Nano, or mid-range laptops.
 - **Teacher output** is organized into `teacher_output/input/`, `target/`, and `output/` for visual and quantitative comparisons.
+
+## 📈 Why MS-SSIM?
+
+We use **Multi-Scale Structural Similarity Index (MS-SSIM)** as our primary evaluation metric.
+
+✅ Unlike standard SSIM (which measures similarity at a single scale), MS-SSIM evaluates image quality across multiple resolutions.  
+This makes it more aligned with human visual perception, especially for assessing sharpness and structural fidelity.
+
+✅ MS-SSIM is now standard in image restoration research because it better captures how humans perceive improvements in texture and detail.
+
+---
+
+## 📝 Performance Highlights
+
+| Metric     | Single Image | 100-Image Average |
+|------------|--------------|-------------------|
+| MS-SSIM    | 0.95         | 0.90              |
+| FPS        | 30+          | Real-time         |
 
 ---
 
