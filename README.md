@@ -105,7 +105,7 @@ Restormer/Motion_Deblurring/pretrained_models/
 #### 🗂️ Output Folder Structure
 
 ```bash
-outputs/
+output/
 ├── student_output/
 │   ├── input/     # Blurred input frames
 │   ├── target/    # Ground truth (clean) frames
