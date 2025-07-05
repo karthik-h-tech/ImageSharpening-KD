@@ -190,7 +190,7 @@ python test/test_student_video.py
 python Scripts/degrade_video.py
  ```
 
-### 5. 👁️ Subjective Evaluation (MOS)
+### 6.  👁️ Subjective Evaluation (MOS)
 
 Subjective quality was assessed using the **Mean Opinion Score (MOS)** method.
 
@@ -207,6 +207,8 @@ The evaluation was performed using the `mos_evaluation.xlsx` file located in the
 ```
 
 This indicates **high perceptual quality** of the restored outputs compared to degraded inputs, closely aligning with teacher-level performance as perceived by human observers.
+
+
 ---
 
 ## 📁 File Descriptions
@@ -216,16 +218,16 @@ This indicates **high perceptual quality** of the restored outputs compared to d
 | `train.py`                   | Trains student model using teacher supervision             |
 | `models/student_model.py`    | Lightweight model for real-time inference (30+ FPS)        |
 | `models/teacher_model.py`    | Wrapper for pretrained Restormer model                     |
-| `blur.py`                    | Simulates realistic motion blur                            |
-| `generate_patches.py`        | Splits high-res images into training patches               |
-| `evaluate.py`                | Computes SSIM and PSNR metrics                             |
-| `benchmark_model_fps.py`     | Measures FPS of student model on target hardware           |
-| `test_student.py`            | Runs student model on sample test data                     |
-| `test_restormer_teacher.py`  | Runs teacher model and saves input, target, output images  |
-| `download_data.py`           | Downloads datasets (e.g., DIV2K, Unsplash)                 |
-| `extract_data.py`            | Unzips and organizes datasets                              |
-| `MOS_evaluation/`            | Subjective visual rating templates                         |
-| `teacher_output/`            | Contains input, target, and restored teacher outputs       |
+| `Scripts/generate_patches.py`        | Splits high-res images into training patches               |
+| `evaluation/evaluate.py`                | Computes SSIM and PSNR metrics                             |
+| `evaluation/benchmark_model_fps.py`     | Measures FPS of student model on target hardware           |
+| `test/test_student.py`            | Runs student model on sample test data                     |
+| `test/test_restormer_teacher.py`  | Runs teacher model and saves input, target, output images  |
+| `Scripts/download_data.py`           | Downloads datasets (e.g., DIV2K, Unsplash)                 |
+| `Scripts/extract_data.py`            | Unzips and organizes datasets                              |
+| `evaluation/MOS_evaluation.xlsx/`            | Contains image-wise ratings from multiple raters and computed average MOS (4.13375)                       |
+| `outputs/student_output/`   | Contains input (blurred), target (ground truth), and restored outputs from the student model |
+| `output/teacher_output/`            | Contains input, target, and restored outputs from the teacher model (Restormer)      |
 
 ---
 
