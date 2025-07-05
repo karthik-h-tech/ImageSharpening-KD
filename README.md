@@ -78,22 +78,22 @@ Restormer/Motion_Deblurring/pretrained_models/
 
 - **Download datasets**:
   ```bash
-  python download_data.py
+  python Scripts/download_data.py
   ```
 
 - **Extract archives**:
   ```bash
-  python extract_data.py
+  python Scripts/extract_data.py
   ```
 
 - **Generate training patches**:
   ```bash
-  python generate_patches.py
+  python Scripts/generate_patches.py
   ```
 
 - **Apply synthetic blur**:
   ```bash
-  python generate_test_input_blur.py
+  python Scripts/generate_test_input_blur.py
   ```
 
 ---
