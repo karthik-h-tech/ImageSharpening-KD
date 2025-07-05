@@ -43,9 +43,7 @@ ImageSharpening-KD/
 │   ├── evaluate.py
 │   ├── benchmark_model_fps.py
 │   └── MOS_evaluation/
-├── train/
-│   ├── train.py
-│   └── student_model_trainer.py
+├── train.py  
 ├── test/
 │   ├── test_student.py
 │   ├── test_student_video.py
@@ -156,12 +154,12 @@ python train.py
 
 - **Evaluate SSIM, PSNR**:
   ```bash
-  python evaluate/evaluate.py
+  python evaluation/evaluate.py
   ```
 
 - **Benchmark student model speed**:
   ```bash
-  python evaluate/benchmark_model_fps.py
+  python evaluation/benchmark_model_fps.py
   ```
 
 ---
