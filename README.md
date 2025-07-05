@@ -104,7 +104,7 @@ Restormer/Motion_Deblurring/pretrained_models/
 - It is pretrained and provides high-quality restoration performance.
 - Used only for training the student model or as a comparison baseline.
 
-#### 🗂️ ### 🗂️ Output Folder Structure
+#### 🗂️ Output Folder Structure
 
 ```bash
 outputs/
@@ -141,27 +141,27 @@ python train.py
   https://drive.google.com/file/d/1VPZTQGoDkdzldFk7PH1KH_vfIg1KwRq8/view?usp=drive_link  
   Place it in the project root directory and run:  
   ```bash
-  python extract_test.py
+  python Scripts/extract_test.py
   ```
  
 - **Test the student model**:
   ```bash
-  python test_student.py
+  python test/test_student.py
   ```
 
 - **Test the teacher (Restormer) model**:
   ```bash
-  python test_restormer_teacher.py
+  python test/test_restormer_teacher.py
   ```
 
 - **Evaluate SSIM, PSNR**:
   ```bash
-  python evaluate.py
+  python evaluate/evaluate.py
   ```
 
 - **Benchmark student model speed**:
   ```bash
-  python benchmark_model_fps.py
+  python evaluate/benchmark_model_fps.py
   ```
 
 ---
@@ -173,21 +173,21 @@ python train.py
   [https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link](https://drive.google.com/drive/folders/1jWuOOYjfB6ELCkwQsJ9l4uX6LwxesY_6?usp=drive_link)  
   Place them under:
 ```bash
-  student_output/input_student/
-  student_output/target_student/
-  student_output/output_student/
+  Output/student_output/input_student/
+  Output/student_output/target_student/
+  Output/student_output/output_student/
  ```
 - ** Test the Model on Video**
  ```bash
-python test_student_video.py
+python test/test_student_video.py
  ```
 - **Output:
  ```bash
- student_output/output_student/output_student_video_side_by_side.mp4**     
+ Output/student_output/output_student/output_student_video_side_by_side.mp4**     
 ```
 - **Simulate Realistic Conferencing Blur**
  ```bash
-python degrade_video.py
+python Scripts/degrade_video.py
  ```
 
 ### 5. 👁️ Subjective Evaluation (MOS)
