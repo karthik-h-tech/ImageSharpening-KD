@@ -25,15 +25,35 @@ git clone https://github.com/swz30/Restormer.git
 Ensure your project folder has the following structure:
 
 ```
-your_project/
-├── Restormer/
-│   └── Motion_Deblurring/
-├── train.py
-├── test_student.py
+ImageSharpening-KD/
+├── data/
 ├── models/
-│   ├── student_model.py
-│   └── teacher_model.py
-└── ...
+├── outputs/
+│   ├── student_output/
+│   └── teacher_output/
+├── scripts/
+│   ├── download_data.py
+│   ├── extract_data.py
+│   ├── extract_test.py
+│   ├── generate_patches.py
+│   ├── generate_test_input.py
+│   ├── degrade_video.py
+│   └── analyze_dataset_quality.py
+├── evaluation/
+│   ├── evaluate.py
+│   ├── benchmark_model_fps.py
+│   └── MOS_evaluation/
+├── train/
+│   ├── train.py
+│   └── student_model_trainer.py
+├── test/
+│   ├── test_student.py
+│   ├── test_student_video.py
+│   └── test_restorer_teacher.py
+├── requirements.txt
+├── README.md
+└── Restormer/
+    └── Motion_Deblurring/
 ```
 
 ---
