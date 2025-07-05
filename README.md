@@ -177,11 +177,11 @@ python train.py
   Output/student_output/target_student/
   Output/student_output/output_student/
  ```
-- ** Test the Model on Video**
+- Test the Model on Video
  ```bash
 python test/test_student_video.py
  ```
-- **Output:
+- Output:
  ```bash
  Output/student_output/output_student/output_student_video_side_by_side.mp4**     
 ```
@@ -192,11 +192,21 @@ python Scripts/degrade_video.py
 
 ### 5. 👁️ Subjective Evaluation (MOS)
 
-Use the `MOS_evaluation/` folder to:
+Subjective quality was assessed using the **Mean Opinion Score (MOS)** method.
 
-- Conduct human visual rating (Mean Opinion Score).
-- Use included Excel templates or Python-based surveys.
+The evaluation was performed using the `mos_evaluation.xlsx` file located in the `evaluation/MOS_evaluation/` directory. This spreadsheet includes:
 
+- Ratings from **multiple human raters**
+- Individual scores for **each test image**
+- Automatically computed **average MOS score**
+
+📊 The overall average MOS achieved by the student model was:
+
+```
+⭐ Average MOS: 4.13375 / 5.0
+```
+
+This indicates **high perceptual quality** of the restored outputs compared to degraded inputs, closely aligning with teacher-level performance as perceived by human observers.
 ---
 
 ## 📁 File Descriptions
