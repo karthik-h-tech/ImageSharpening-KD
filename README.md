@@ -14,13 +14,15 @@ By distilling knowledge from the Restormer model (CVPR 2022), the student model 
 
 ## 📜 Final Project Report
 
-[📝 Project Report.pdf](Project Report.pdf)
+📄 [📝 Project Report.pdf](Project%20Report.pdf)  
+This document details the complete methodology, implementation, and results of our project.
 
 ---
 
 ## 📊 Project Presentation
 
-[📽️ Project.pptx](Project.pptx)
+📽️ [📊 Project.pptx](Project.pptx)  
+This slide deck summarizes the key stages and outcomes of the project in a visual format.
 
 ## 📦 Prerequisites
 
