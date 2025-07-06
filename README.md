@@ -14,7 +14,7 @@ By distilling knowledge from the Restormer model (CVPR 2022), the student model 
 
 ## 📜 Final Project Report
 
-[📝 Project Report.pdf](ProjectReport.pdf)
+[📝 Project Report.pdf](Project Report.pdf)
 
 ---
 
@@ -238,8 +238,8 @@ This indicates **high perceptual quality** of the restored outputs compared to d
 | `evaluation/MOS_evaluation.xlsx/`            | Contains image-wise ratings from multiple raters and computed average MOS (4.13375)                       |
 | `outputs/student_output/`   | Contains input (blurred), target (ground truth), and restored outputs from the student model |
 | `output/teacher_output/`            | Contains input, target, and restored outputs from the teacher model (Restormer)      |
-| Project Report.pdf   | Final project report detailing the approach and results    |
-|Project.pptx | Slide deck summarizing the project workflow and outcomes |
+| `Project Report.pdf`  | Final project report detailing the approach and results    |
+| `Project.pptx` | Slide deck summarizing the project workflow and outcomes |
 
 ---
 
