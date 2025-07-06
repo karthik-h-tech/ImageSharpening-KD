@@ -22,7 +22,7 @@ This document details the complete methodology, implementation, and results of o
 ## 📊 Project Presentation
 
 📽️ [📊 Project.pptx](Project.pptx)  
-This slide deck summarizes the key stages and outcomes of the project in a visual format.
+This presentation outlines the problem statement, process flow, technologies used, and a summary of the project outcomes.
 
 ## 📦 Prerequisites
 
