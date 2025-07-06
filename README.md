@@ -21,7 +21,7 @@ This document details the complete methodology, implementation, and results of o
 
 ## 📊 Project Presentation
 
-📽️ [📊 Project.pptx](Project.pptx)  
+📽️ [📊 project.pptx](project.pptx)  
 This presentation outlines the problem statement, process flow, technologies used, and a summary of the project outcomes.
 
 ## 📦 Prerequisites
