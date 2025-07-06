@@ -12,6 +12,16 @@ By distilling knowledge from the Restormer model (CVPR 2022), the student model 
 
 ---
 
+## 📜 Final Project Report
+
+[📝 Project report.pdf](ProjectReport.pdf)
+
+---
+
+## 📊 Project Presentation
+
+[📽️ Project.pptx](Project.pptx)
+
 ## 📦 Prerequisites
 
 ### ✅ Clone Restormer Repository
