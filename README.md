@@ -61,6 +61,7 @@ ImageSharpening-KD/
 ├── requirements.txt
 ├── project.pptx
 ├── README.md
+├── project report.pdf
 └── Restormer/
     └── Motion_Deblurring/
 ```
@@ -237,6 +238,8 @@ This indicates **high perceptual quality** of the restored outputs compared to d
 | `evaluation/MOS_evaluation.xlsx/`            | Contains image-wise ratings from multiple raters and computed average MOS (4.13375)                       |
 | `outputs/student_output/`   | Contains input (blurred), target (ground truth), and restored outputs from the student model |
 | `output/teacher_output/`            | Contains input, target, and restored outputs from the teacher model (Restormer)      |
+| Project_Report_Team_Vertex.pdf   | Final project report detailing the approach and results    |
+| Project_Presentation_Team_Vertex.pptx | Slide deck summarizing the project workflow and outcomes |
 
 ---
 
