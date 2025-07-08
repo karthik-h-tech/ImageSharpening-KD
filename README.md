@@ -305,6 +305,14 @@ This makes it more aligned with human visual perception, especially for assessin
 | FPS        | 30+          | Real-time         | Real-time     |
 
 
+## ❗ Limitations
+
+While the system performs well in realistic scenarios, the following limitations exist:
+
+- 🔁 **No temporal modeling**: Each frame is processed independently. Flickering may occur in fast-moving scenes or video transitions.
+- 🔧 **Edge cases in high-blur**: Performance drops significantly on severely blurred frames — the student model is optimized for **mild motion blur** seen in conferencing, not heavy blur.
+- 🧠 **Difficult textures**: In some cases, the model struggles to restore **fine details** like facial hair, background text, or dense patterns if they are heavily distorted.
+
 ## 🧩 Deployment Note for Real-World Scenarios
 
 This framework is optimized for **real-time restoration of lightly degraded video frames**, especially under conditions typical of:
